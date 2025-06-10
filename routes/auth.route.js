@@ -6,18 +6,24 @@ import {
     updatePassword,
     verifyForgotPasswordRequest,
 } from '../controllers/auth.controller.js';
-import { USER_TYPES } from '../constants/common.constant.js';
 import { authorize } from '../middlewares/authorize.middleware.js';
+
 const router = Router();
 
 /**
  * @swagger
- * /admin/login:
+ * /auth/login/{userType}:
  *   post:
  *     tags:
- *       - Admin Authentication
- *     summary: Login a user
- *     description: Authenticates a user using email and password and returns a token.
+ *       - Authentication
+ *     summary: Login for all user types
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [admin, garage-admin, user]
  *     requestBody:
  *       required: true
  *       content:
@@ -31,14 +37,12 @@ const router = Router();
  *               email:
  *                 type: string
  *                 format: email
- *                 example: petnowadmin@yopmail.com
  *               password:
  *                 type: string
  *                 format: password
- *                 example: Pa$w0rd!
  *     responses:
  *       200:
- *         description: Login successfully
+ *         description: Login successful
  *         content:
  *           application/json:
  *             schema:
@@ -46,39 +50,42 @@ const router = Router();
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Login successfully
  *                 token:
  *                   type: string
- *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *       400:
- *         description: Invalid credentials
- *       500:
- *         description: Internal server error
+ *                 userType:
+ *                   type: string
  */
-router.post('/login', login);
+router.post('/login/:userType', login);
 
 /**
  * @swagger
- * /admin/logout:
+ * /auth/logout:
  *   post:
- *     summary: User logout
+ *     summary: Logout for all user types
  *     tags:
- *       - Admin Authentication
+ *       - Authentication
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Logged out successfully
- *       401:
- *         description: Unauthorized
  */
-router.post('/logout', authorize([USER_TYPES.ADMIN]), logout);
+router.post('/logout', authorize(), logout);
 
 /**
  * @swagger
- * /admin/forgot-password:
+ * /auth/forgot-password/{userType}:
  *   post:
- *     summary: Request for password reset
+ *     summary: Request password reset for any user type
  *     tags:
- *       - Admin Forgot Password
+ *       - Password Management
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [admin, garage-admin, user]
  *     requestBody:
  *       required: true
  *       content:
@@ -88,24 +95,25 @@ router.post('/logout', authorize([USER_TYPES.ADMIN]), logout);
  *             properties:
  *               email:
  *                 type: string
- *                 example: petnowadmin@yopmail.com
  *             required:
  *               - email
- *     responses:
- *       200:
- *         description: Forgot password email sended successfully
- *       404:
- *         description: User not found
  */
-router.post('/forgot-password', forgotPassword);
+router.post('/forgot-password/:userType', forgotPassword);
 
 /**
  * @swagger
- * /admin/verify-forgot-password-request:
+ * /auth/verify-forgot-password-request/{userType}:
  *   post:
- *     summary: Verify password reset request
+ *     summary: Verify password reset request for any user type
  *     tags:
- *       - Admin Forgot Password
+ *       - Password Management
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [admin, garage-admin, user]
  *     requestBody:
  *       required: true
  *       content:
@@ -115,39 +123,31 @@ router.post('/forgot-password', forgotPassword);
  *             properties:
  *               email:
  *                 type: string
- *                 example: petnowadmin@yopmail.com
  *               otp:
  *                 type: number
- *                 example: 342423
  *             required:
  *               - email
  *               - otp
- *     responses:
- *       200:
- *         description: OTP verified successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "OTP verified successfully"
- *                 forgotPasswordRequestId:
- *                   type: string
- *                   example: "67f7b7d15609ddc87d0a38ee"
- *       400:
- *         description: Invalid or expired token
  */
-router.post('/verify-forgot-password-request', verifyForgotPasswordRequest);
+router.post(
+    '/verify-forgot-password-request/:userType',
+    verifyForgotPasswordRequest,
+);
 
 /**
  * @swagger
- * /admin/update-password:
+ * /auth/update-password/{userType}:
  *   post:
- *     summary: Update user password
+ *     summary: Update password for any user type
  *     tags:
- *       - Admin Forgot Password
+ *       - Password Management
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [admin, garage-admin, user]
  *     requestBody:
  *       required: true
  *       content:
@@ -157,26 +157,12 @@ router.post('/verify-forgot-password-request', verifyForgotPasswordRequest);
  *             properties:
  *               newPassword:
  *                 type: string
- *                 example: NewPassword
  *               forgotPasswordRequestId:
  *                 type: string
- *                 example: "675954cfd1c3aff9bc0fb7b5"
  *             required:
  *               - newPassword
  *               - forgotPasswordRequestId
- *     responses:
- *       200:
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Password updated successfully"
- *       404:
- *         description: Forgot password request not found
  */
-router.post('/update-password', updatePassword);
+router.post('/update-password/:userType', updatePassword);
 
 export default router;
