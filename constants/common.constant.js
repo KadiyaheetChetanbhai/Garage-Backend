@@ -1,5 +1,7 @@
 export const USER_TYPES = {
-    ADMIN: 'Admin',
+    SUPERADMIN: 'superadmin',
+    GARAGE_ADMIN: 'garage-admin', 
+    USER: 'user',
 };
 const logoUrl = `${process.env.SERVER_URL}/public/logo.png`;
 

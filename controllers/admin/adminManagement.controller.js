@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { USER_TYPES } from '../../constants/common.constant.js';
 import { sendMail } from '../../mail/sendMail.js';
 import Permission from '../../models/permission.model.js';
-import User from '../../models/user.model.js';
+import superAdmin from '../../models/superAdmin.model.js';
 import {
     errorResponse,
     generatePassword,
@@ -73,7 +73,7 @@ export const createAdmin = async (req, res) => {
             );
         }
 
-        const existingAdmin = await User.findOne({ email });
+        const existingAdmin = await  superAdmin.findOne({ email });
         if (existingAdmin) {
             return errorResponse(
                 res,
@@ -82,11 +82,11 @@ export const createAdmin = async (req, res) => {
             );
         }
         const password = generatePassword();
-        const newAdmin = await new User({
+        const newAdmin = await new  superAdmin({
             name,
             email,
             password,
-            userType: USER_TYPES.ADMIN,
+            userType:  USER_TYPES.SUPERADMIN,
             permissions,
         }).save();
 
@@ -119,7 +119,7 @@ export const listAdmins = async (req, res) => {
         const allowedSortFields = ['createdAt', 'name', 'email'];
         validateSortField(sortField, allowedSortFields);
 
-        const matchConditions = [{ userType: USER_TYPES.ADMIN }];
+        const matchConditions = [{ userType:  USER_TYPES.SUPERADMIN }];
 
         if (searchTerm) {
             matchConditions.push({
@@ -130,7 +130,7 @@ export const listAdmins = async (req, res) => {
             });
         }
 
-        const data = await User.aggregate([
+        const data = await  superAdmin.aggregate([
             {
                 $match: matchConditions.length ? { $and: matchConditions } : {},
             },
@@ -148,7 +148,7 @@ export const listAdmins = async (req, res) => {
             { $limit: limit },
         ]);
 
-        const [totalData] = await User.aggregate([
+        const [totalData] = await  superAdmin.aggregate([
             { $match: matchConditions.length ? { $and: matchConditions } : {} },
             { $count: 'total' },
         ]);
@@ -188,7 +188,7 @@ export const getAdminDetail = async (req, res) => {
     try {
         const { id: adminId } = req.params;
 
-        const [data] = await User.aggregate([
+        const [data] = await  superAdmin.aggregate([
             {
                 $match: { _id: new mongoose.Types.ObjectId(adminId) },
             },
@@ -257,7 +257,7 @@ export const updateAdmin = async (req, res) => {
         const { name, email, permissions } =
             await updateAdminSchema.validateAsync(req.body);
 
-        const existingAdmin = await User.findById(adminId);
+        const existingAdmin = await  superAdmin.findById(adminId);
         if (!existingAdmin) {
             return errorResponse(res, { message: 'Admin not found' }, 404);
         }
@@ -270,7 +270,7 @@ export const updateAdmin = async (req, res) => {
         }
 
         if (email && email !== existingAdmin.email) {
-            const emailTaken = await User.findOne({ email });
+            const emailTaken = await  superAdmin.findOne({ email });
             if (emailTaken) {
                 return errorResponse(
                     res,
@@ -313,7 +313,7 @@ export const deleteAdmin = async (req, res) => {
     try {
         const { id: adminId } = req.params;
 
-        const existingAdmin = await User.findById(adminId);
+        const existingAdmin = await  superAdmin.findById(adminId);
         if (!existingAdmin) {
             return errorResponse(res, { message: 'Admin not found' }, 404);
         }
@@ -324,7 +324,7 @@ export const deleteAdmin = async (req, res) => {
                 422,
             );
         }
-        await User.findByIdAndDelete(adminId);
+        await  superAdmin.findByIdAndDelete(adminId);
         return successResponse(res, { message: 'Admin deleted successfully' });
     } catch (error) {
         return errorResponse(

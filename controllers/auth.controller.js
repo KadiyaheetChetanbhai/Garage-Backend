@@ -7,6 +7,7 @@ import ForgotPasswordRequest from '../models/forgotPasswordRequest.model.js';
 import User from '../models/user.model.js';
 import {
     errorResponse,
+    findUserByEmail,
     generateOTP,
     getExpiryDate,
     getTodayDate,
@@ -24,17 +25,20 @@ export const login = async (req, res) => {
     try {
         const result = await loginSchema.validateAsync(req.body);
 
-        const user = await User.findOne({ email: result.email });
+        const { user, userType } = await findUserByEmail(result.email);
         if (!user) {
             return errorResponse(res, { message: 'Invalid credentials' }, 401);
         }
+
         const isMatch = await user.isValidPassword(result.password);
         if (!isMatch) {
             return errorResponse(res, { message: 'Invalid credentials' }, 401);
         }
-        const token = await signAccessToken(user._id.toString(), user.userType);
+
+        const token = await signAccessToken(user._id.toString(), userType);
         user.jwtToken = token;
         await user.save();
+
         return successResponse(res, {
             message: 'Logged in successfully',
             token,
@@ -70,32 +74,34 @@ export const logout = async (req, res) => {
 export const forgotPassword = async (req, res) => {
     try {
         const { email } = await forgotPasswordSchema.validateAsync(req.body);
-        const user = await User.findOne({ email });
-        if (!user) {
+
+        const { user, userType } = await findUserByEmail(email);
+        if (!user)
             return errorResponse(res, { message: 'User not found' }, 404);
-        }
 
         const count = await ForgotPasswordRequest.countDocuments({
             userId: user._id,
+            userType,
             createdAt: { $gte: getTodayDate() },
         });
+
         if (count >= MAX_RESET_PASS_REQUESTS_PER_DAY) {
             return errorResponse(
                 res,
                 {
-                    message:
-                        'You have reached the limit of password reset requests for today',
+                    message: 'Password reset request limit reached',
                 },
                 429,
             );
         }
+
         const otp = generateOTP();
-        const forgotPasswordRequest = new ForgotPasswordRequest({
+        await ForgotPasswordRequest.create({
             userId: user._id,
+            userType,
             otp,
             expiresAt: getExpiryDate(OTP_EXPIRATION_MINUTES),
         });
-        await forgotPasswordRequest.save();
 
         sendMail({
             to: user.email,
@@ -105,15 +111,10 @@ export const forgotPassword = async (req, res) => {
         });
 
         return successResponse(res, {
-            message: 'Forgot password email sent successfully',
+            message: 'OTP sent successfully',
         });
     } catch (error) {
-        return errorResponse(
-            res,
-            { message: 'Something went wrong', error: error.message },
-            500,
-            error,
-        );
+        return errorResponse(res, { message: error.message }, 500, error);
     }
 };
 
@@ -183,8 +184,8 @@ export const updatePassword = async (req, res) => {
                 422,
             );
         }
-
-        const user = await User.findById(forgotPasswordRequest.userId);
+        const userModel = getUserModel(forgotPasswordRequest.userType);
+        const user = await userModel.findById(forgotPasswordRequest.userId);
         if (!user)
             return errorResponse(res, { message: 'User not found' }, 404);
         user.password = newPassword;

@@ -1,17 +1,17 @@
 import { Router } from 'express';
+
 import {
-    createAdmin,
-    deleteAdmin,
-    getAdminDetail,
-    getAllPermissions,
-    listAdmins,
-    updateAdmin,
-} from '../../controllers/admin/adminManagement.controller.js';
+    getGarageAdminDetail,
+    updateGarageAdmin,
+    deleteGarageAdmin,
+    listGarageAdmin,
+} from '../../controllers/garageAdmin/garageAdminManagement.controller.js';
 import { hasPermission } from '../../middlewares/hasPermission.middleware.js';
 import {
     MODULES,
     PERMISSION_EVENTS,
 } from '../../constants/permission.constant.js';
+import { getAllPermissions } from '../../controllers/admin/adminManagement.controller.js';
 
 const router = Router();
 
@@ -58,54 +58,6 @@ const router = Router();
  *         description: Internal server error
  */
 router.get('/permissions', getAllPermissions);
-
-/**
- * @swagger
- * /admin/create-admin:
- *   post:
- *     summary: Create New Admin
- *     tags:
- *       - Admin Management
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: New Admin
- *               email:
- *                 type: string
- *                 example: newadmin@yopmail.com
- *               permissions:
- *                 type: array
- *                 items:
- *                   type: string
- *                   example: "67fcb31707a7b0302eb8b889"
- *             required:
- *               - name
- *               - email
- *               - permissions
- *     responses:
- *       200:
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Admin created successfully
- *       422:
- *         description: Unprocessable entity
- */
-router.post(
-    '/create-superAdmin',
-    hasPermission(MODULES.adminManagement, PERMISSION_EVENTS.CREATE),
-    createAdmin,
-);
 
 /**
  * @swagger
@@ -197,7 +149,7 @@ router.post(
 router.get(
     '/list',
     hasPermission(MODULES.adminManagement, PERMISSION_EVENTS.LIST),
-    listAdmins,
+    listGarageAdmin,
 );
 
 /**
@@ -253,7 +205,7 @@ router.get(
 router.get(
     '/detail/:id',
     hasPermission(MODULES.adminManagement, PERMISSION_EVENTS.VIEW),
-    getAdminDetail,
+    getGarageAdminDetail,
 );
 
 /**
@@ -304,9 +256,9 @@ router.get(
  *         description: Invalid input or permissions not found
  */
 router.put(
-    '/update-superAdmin/:id',
+    '/update-admin/:id',
     hasPermission(MODULES.adminManagement, PERMISSION_EVENTS.EDIT),
-    updateAdmin,
+    updateGarageAdmin,
 );
 
 /**
@@ -341,9 +293,181 @@ router.put(
  *         description: Invalid ID format
  */
 router.delete(
-    '/delete-superAdmin/:id',
+    '/delete-admin/:id',
     hasPermission(MODULES.adminManagement, PERMISSION_EVENTS.DELETE),
-    deleteAdmin,
+    deleteGarageAdmin,
 );
+
+/**
+ * @swagger
+ * /garage-admin/list:
+ *   get:
+ *     summary: Get a paginated list of garage admins
+ *     tags:
+ *       - Garage Admin Management
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number (default is 1)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of items per page (default is 10)
+ *       - in: query
+ *         name: searchTerm
+ *         schema:
+ *           type: string
+ *         description: Text to search in name, email or garage name
+ *     responses:
+ *       200:
+ *         description: List of garage admins retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Garage Admin list retrieved successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       garageName:
+ *                         type: string
+ *                       address:
+ *                         type: string
+ *                       contactNumber:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ */
+
+/**
+ * @swagger
+ * /garage-admin/detail/{id}:
+ *   get:
+ *     summary: Get garage admin details
+ *     tags:
+ *       - Garage Admin Management
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID of the garage admin
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Garage admin details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     garageName:
+ *                       type: string
+ *                     address:
+ *                       type: string
+ *                     contactNumber:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ */
+
+/**
+ * @swagger
+ * /garage-admin/update/{id}:
+ *   put:
+ *     summary: Update Existing Garage Admin
+ *     tags:
+ *       - Garage Admin Management
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Garage Admin ID to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Updated Garage Admin Name
+ *               email:
+ *                 type: string
+ *                 example: updatedgarageadmin@yopmail.com
+ *               garageName:
+ *                 type: string
+ *                 example: Updated Star Garage
+ *               address:
+ *                 type: string
+ *                 example: 456 New St, City
+ *               contactNumber:
+ *                 type: string
+ *                 example: "+9876543210"
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ */
+router.put('/update/:id', updateGarageAdmin);
+
+/**
+ * @swagger
+ * /garage-admin/delete/{id}:
+ *   delete:
+ *     summary: Delete a garage admin
+ *     tags:
+ *       - Garage Admin Management
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID of the garage admin to delete
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Garage admin deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Garage admin deleted successfully
+ *       404:
+ *         description: Garage admin not found
+ *       422:
+ *         description: Invalid ID format
+ */
+router.delete('/delete/:id', deleteGarageAdmin);
 
 export default router;
