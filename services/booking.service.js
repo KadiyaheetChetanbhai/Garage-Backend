@@ -37,7 +37,17 @@ export const sendBookingConfirmationEmail = async (booking) => {
         );
 
         // Format time - now using the selectedTimeSlot directly
-        const formattedTime = booking.selectedTimeSlot;
+        const formattedTime = (() => {
+            if (booking.timeSlots && booking.timeSlots.length > 0) {
+                const activeSlot = booking.timeSlots.find(
+                    (slot) => !slot.isClosed,
+                );
+                return activeSlot
+                    ? activeSlot.open
+                    : 'Check your booking details';
+            }
+            return booking.selectedTimeSlot || 'Check your booking details';
+        })();
 
         // Format services list
         const servicesList = services.map((service) => ({

@@ -5,7 +5,13 @@ import { USER_TYPES } from '../constants/common.constant.js';
 const superAdminSchema = new mongoose.Schema(
     {
         name: { type: String, required: true },
-        email: { type: String, required: true },
+        email: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        lowercase: true, // This automatically converts to lowercase when saving
+    },
         userType: {
             type: String,
             enum: Object.values(USER_TYPES),

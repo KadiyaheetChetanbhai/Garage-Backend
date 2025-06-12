@@ -18,7 +18,7 @@ const serviceSchema = new mongoose.Schema(
             type: Number, // Duration in minutes
             required: true,
         },
-        // Change from string enum to reference Category model
+        
         category: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Category',
@@ -36,7 +36,6 @@ const serviceSchema = new mongoose.Schema(
             ref: 'Garage',
             required: true,
         },
-        // Add reference to available time slots
         availableTimeSlots: [
             {
                 day: {
