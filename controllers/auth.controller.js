@@ -11,6 +11,7 @@ import {
     generateOTP,
     getExpiryDate,
     getTodayDate,
+    getUserModel,
     signAccessToken,
     successResponse,
 } from '../helpers/general.helper.js';
@@ -26,6 +27,7 @@ export const login = async (req, res) => {
         const result = await loginSchema.validateAsync(req.body);
 
         const { user, userType } = await findUserByEmail(result.email);
+
         if (!user) {
             return errorResponse(res, { message: 'Invalid credentials' }, 401);
         }
@@ -36,12 +38,14 @@ export const login = async (req, res) => {
         }
 
         const token = await signAccessToken(user._id.toString(), userType);
+
         user.jwtToken = token;
         await user.save();
 
         return successResponse(res, {
             message: 'Logged in successfully',
             token,
+            userType,
         });
     } catch (error) {
         return errorResponse(
@@ -55,18 +59,23 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
-        const user = req.user;
-        user.jwtToken = null;
-        await user.save();
-        return successResponse(res, {
-            message: 'Logged out successfully',
-        });
+        const userId = req.userId;
+        const userType = req.userType;
+        console.log(
+            userId,
+            userType,
+            'this is userId and userType in logout controller',
+        );
+
+        const UserModel = getUserModel(userType);
+        await UserModel.findByIdAndUpdate(userId, { jwtToken: null });
+
+        return successResponse(res, { message: 'Logged out successfully' });
     } catch (error) {
         return errorResponse(
             res,
             { message: 'Something went wrong', error: error.message },
             500,
-            error,
         );
     }
 };
@@ -120,9 +129,12 @@ export const forgotPassword = async (req, res) => {
 
 export const verifyForgotPasswordRequest = async (req, res) => {
     try {
+        console.log('hii');
         const result = await verifyForgotPasswordSchema.validateAsync(req.body);
 
-        const user = await User.findOne({ email: result.email });
+        const UserModel = getUserModel(req.params.userType);
+
+        const user = await UserModel.findOne({ email: result.email });
         if (!user)
             return errorResponse(res, { message: 'User not found' }, 404);
 

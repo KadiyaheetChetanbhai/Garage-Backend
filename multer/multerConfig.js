@@ -26,7 +26,6 @@ const storage = (module) =>
         },
         filename: function (req, file, cb) {
             // Log original name for debugging
-            console.log('Original filename:', file.originalname);
 
             const uniqueSuffix =
                 Date.now() + '-' + Math.round(Math.random() * 1e9);

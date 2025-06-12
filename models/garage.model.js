@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+import { DAYS_OF_WEEK_ARRAY } from '../constants/common.constant.js';
 
 const garageSchema = new mongoose.Schema(
     {
@@ -25,10 +25,14 @@ const garageSchema = new mongoose.Schema(
         pickupDropAvailable: { type: Boolean },
         timeSlots: [
             {
-                day: { type: String },
-                open: { type: String },
-                close: { type: String },
-                isClosed: { type: Boolean },
+                day: {
+                    type: String,
+                    required: true,
+                    enum: DAYS_OF_WEEK_ARRAY, 
+                },
+                open: { type: String, required: true },
+                close: { type: String, required: true },
+                isClosed: { type: Boolean, default: false },
             },
         ],
         createdAt: { type: Date },
@@ -39,5 +43,5 @@ const garageSchema = new mongoose.Schema(
     },
 );
 
-const Garage = mongoose.model('garage', garageSchema);
+const Garage = mongoose.model('Garage', garageSchema);
 export default Garage;

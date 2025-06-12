@@ -1,13 +1,15 @@
-import mongoose from 'mongoose';
 import { config as dotenvConfig } from 'dotenv';
-import User from '../models/user.model.js';
-import { clinics, services, users, cmsContents } from './data.js';
+import mongoose from 'mongoose';
 import {
     MODULES,
     PERMISSION_EVENTS,
 } from '../constants/permission.constant.js';
-import Permission from '../models/permission.model.js';
 import logger from '../helpers/logger.helper.js';
+import Permission from '../models/permission.model.js';
+import User from '../models/user.model.js';
+import SuperAdmin from '../models/superAdmin.model.js'; // Add this import
+import { garageAdmins, superAdmins, users } from './data.js';
+import garageOwner from '../models/garageOwner.model.js';
 
 dotenvConfig();
 
@@ -50,9 +52,42 @@ const seedPermissions = async () => {
     }
 };
 
-const seedUsers = async () => {
+const seedSuperAdmins = async () => {
     const permissions = await Permission.find({});
     const permissionIds = permissions.map((p) => p._id);
+    for (const userData of superAdmins) {
+        try {
+            const existingSuperAdmin = await SuperAdmin.findOne({
+                email: userData.email,
+            });
+
+            if (!existingSuperAdmin) {
+                const newSuperAdmin = new SuperAdmin({
+                    ...userData,
+                    permissions: permissionIds,
+                });
+                await newSuperAdmin.save();
+                logger.info(`SuperAdmin ${userData.email} created.`);
+            } else {
+                Object.assign(existingSuperAdmin, {
+                    ...userData,
+                    permissions: permissionIds,
+                });
+                await existingSuperAdmin.save();
+                logger.info(
+                    `SuperAdmin ${userData.email} already exists. Updated.`,
+                );
+            }
+        } catch (error) {
+            logger.error(
+                `Error while processing superadmin ${userData.email}:`,
+                error,
+            );
+        }
+    }
+};
+
+const seedUsers = async () => {
     for (const userData of users) {
         try {
             const existingUser = await User.findOne({ email: userData.email });
@@ -60,14 +95,12 @@ const seedUsers = async () => {
             if (!existingUser) {
                 const newUser = new User({
                     ...userData,
-                    permissions: permissionIds,
                 });
                 await newUser.save();
                 logger.info(`User ${userData.email} created.`);
             } else {
                 Object.assign(existingUser, {
                     ...userData,
-                    permissions: permissionIds,
                 });
                 await existingUser.save();
                 logger.info(`User ${userData.email} already exists. Updated.`);
@@ -81,19 +114,50 @@ const seedUsers = async () => {
     }
 };
 
+const seedGarageOwners = async () => {
+    // Get a subset of permissions appropriate for garage owners
+    const garagePermissions = await Permission.find({
+        module: { $in: ['GARAGE', 'SERVICE', 'TRANSPORT'] },
+    });
+    const garagePermissionIds = garagePermissions.map((p) => p._id);
 
+    for (const ownerData of garageAdmins) {
+        try {
+            const existingOwner = await garageOwner.findOne({
+                email: ownerData.email,
+            });
 
-
-
-
+            if (!existingOwner) {
+                const newOwner = new garageOwner({
+                    ...ownerData,
+                    permissions: garagePermissionIds,
+                });
+                await newOwner.save();
+                logger.info(`Garage Owner ${ownerData.email} created.`);
+            } else {
+                Object.assign(existingOwner, {
+                    ...ownerData,
+                    permissions: garagePermissionIds,
+                });
+                await existingOwner.save();
+                logger.info(
+                    `Garage Owner ${ownerData.email} already exists. Updated.`,
+                );
+            }
+        } catch (error) {
+            logger.error(
+                `Error while processing garage owner ${ownerData.email}:`,
+                error,
+            );
+        }
+    }
+};
 
 const seedData = async () => {
     try {
         await connectDB();
         await seedPermissions();
-        await Promise.all([
-            seedUsers(),
-        ]);
+        await Promise.all([seedSuperAdmins(), seedUsers(), seedGarageOwners()]);
     } catch (error) {
         logger.error('Error while seeding data:', error);
     } finally {

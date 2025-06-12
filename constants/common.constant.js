@@ -1,8 +1,29 @@
+export const DAYS_OF_WEEK = {
+    MONDAY: 'Monday',
+    TUESDAY: 'Tuesday',
+    WEDNESDAY: 'Wednesday',
+    THURSDAY: 'Thursday',
+    FRIDAY: 'Friday',
+    SATURDAY: 'Saturday',
+    SUNDAY: 'Sunday',
+};
+
+export const DAYS_OF_WEEK_ARRAY = Object.values(DAYS_OF_WEEK);
+
+// Add other common constants here
 export const USER_TYPES = {
     SUPERADMIN: 'superadmin',
-    GARAGE_ADMIN: 'garage-admin', 
+    GARAGE_ADMIN: 'garage-admin',
     USER: 'user',
 };
+
+export const TIME_SLOT_STATUS = {
+    AVAILABLE: 'available',
+    BOOKED: 'booked',
+    COMPLETED: 'completed',
+    CANCELLED: 'cancelled',
+};
+
 const logoUrl = `${process.env.SERVER_URL}/public/logo.png`;
 
 export const EMAIL_COMMON_DATA = {

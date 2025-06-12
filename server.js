@@ -9,11 +9,12 @@ import requestLogger from './middlewares/requestLogger.middleware.js';
 import routes from './routes/index.route.js';
 import path from 'path';
 import logger from './helpers/logger.helper.js';
-// import agenda from './agenda/agenda.js';
-// import { defineReminderJobs } from './agenda/agenda.js';
+import agenda, { defineReminderJobs } from './agenda/agenda.js';
 
-// defineReminderJobs(agenda);
-// await agenda.start();
+
+
+defineReminderJobs(agenda);
+await agenda.start();
 
 const app = express();
 
@@ -42,6 +43,8 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     logger.info(`Server running on port: ${PORT}`);
 });
+
+
 
 // Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (error) => {

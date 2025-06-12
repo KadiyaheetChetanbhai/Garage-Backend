@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { USER_TYPES } from '../constants/common.constant.js';
 const { Schema } = mongoose;
 
 const forgotPasswordRequestSchema = new Schema(
@@ -9,7 +10,7 @@ const forgotPasswordRequestSchema = new Schema(
         },
         userType: {
             type: String,
-            enum: ['customer', 'garageOwner', 'superAdmin'],
+            enum: Object.values(USER_TYPES),
             required: true,
         },
         otp: {

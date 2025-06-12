@@ -82,7 +82,7 @@ const router = Router();
  */
 router.post(
     '/',
-    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.ADMIN]),
+    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.GARAGE_ADMIN]),
     createService,
 );
 
