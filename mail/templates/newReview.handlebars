@@ -1,0 +1,27 @@
+{{#> base title="New Review Received"}}
+  <h2>New Review Received!</h2>
+  
+  <p>Hello {{name}},</p>
+  
+  <p>Your garage <strong>{{garageName}}</strong> has received a new review.</p>
+  
+  <div class="highlight-box">
+    <h3 style="margin-top: 0;">Review Details</h3>
+    <p><strong>Rating:</strong> 
+      <span style="color: #ff9966; letter-spacing: 2px;">
+        {{#each (range 1 rating)}}★{{/each}}
+      </span>
+      {{rating}}/5
+    </p>
+    
+    <p><strong>Comment:</strong> {{comment}}</p>
+    
+    <p><strong>Date:</strong> {{date}}</p>
+  </div>
+  
+  <div class="text-center">
+    <a href="{{dashboardUrl}}" class="button">View in Dashboard</a>
+  </div>
+  
+  <p>You can respond to this review from your dashboard.</p>
+{{/base}}

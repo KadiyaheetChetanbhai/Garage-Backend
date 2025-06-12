@@ -1,11 +1,12 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
-import { errorResponse } from '../helpers/general.helper.js';
+import { errorResponse, getUserModel } from '../helpers/general.helper.js';
 
 export const authorize = (userTypes = []) => {
     return async (req, res, next) => {
         try {
             const token = req.headers.authorization?.split(' ')[1];
+
             if (!token) {
                 return errorResponse(
                     res,
@@ -15,11 +16,15 @@ export const authorize = (userTypes = []) => {
             }
 
             const payload = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+            console.log(payload, 'this is payload');
             req.userId = payload.aud;
 
             req.userType = payload.userType;
 
-            const user = await User.findById(req.userId);
+            const UserModel = getUserModel(payload.userType);
+
+            const user = await UserModel.findById(req.userId);
+
             if (!user) {
                 return errorResponse(
                     res,

@@ -7,9 +7,9 @@ const userSchema = new mongoose.Schema(
         name: { type: String, required: true },
         email: { type: String, required: true },
         userType: {
-                        type: String,
-            enum: Object.values(USER_TYPES), // Add enum validation 
-            default: USER_TYPES.USER, // Set default user type
+            type: String,
+            enum: Object.values(USER_TYPES), 
+            default: USER_TYPES.USER,
             required: true,
         },
         password: { type: String, required: true },

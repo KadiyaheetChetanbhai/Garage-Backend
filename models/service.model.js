@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { DAYS_OF_WEEK_ARRAY } from '../constants/common.constant.js';
 
 const serviceSchema = new mongoose.Schema(
     {
@@ -17,15 +18,10 @@ const serviceSchema = new mongoose.Schema(
             type: Number, // Duration in minutes
             required: true,
         },
+        // Change from string enum to reference Category model
         category: {
-            type: String,
-            enum: [
-                'repair',
-                'maintenance',
-                'inspection',
-                'customization',
-                'other',
-            ],
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Category',
             required: true,
         },
         image: {
@@ -35,11 +31,33 @@ const serviceSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+        garage: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Garage',
+            required: true,
+        },
+        // Add reference to available time slots
+        availableTimeSlots: [
+            {
+                day: {
+                    type: String,
+                    required: true,
+                    enum: DAYS_OF_WEEK_ARRAY,
+                },
+                open: { type: String, required: true },
+                close: { type: String, required: true },
+                isClosed: { type: Boolean, default: false },
+            },
+        ],
     },
     {
         timestamps: true,
     },
 );
+
+// Create index for faster queries
+serviceSchema.index({ garage: 1, category: 1 });
+serviceSchema.index({ isActive: 1 });
 
 const Service = mongoose.model('Service', serviceSchema);
 export default Service;

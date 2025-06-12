@@ -8,7 +8,8 @@ const superAdminSchema = new mongoose.Schema(
         email: { type: String, required: true },
         userType: {
             type: String,
-            enum: Object.values(USER_TYPES.SUPERADMIN),
+            enum: Object.values(USER_TYPES),
+            default: USER_TYPES.SUPERADMIN,
             required: true,
         },
         password: { type: String, required: true },

@@ -59,6 +59,6 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.get('/admin/profile', authorize([USER_TYPES.ADMIN]), getProfile);
+router.get('/admin/profile', authorize([USER_TYPES.GARAGE_ADMIN]), getProfile);
 
 export default router;

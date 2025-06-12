@@ -12,23 +12,17 @@ const blogSchema = new mongoose.Schema(
         },
         author: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+            ref: 'SuperAdmin',
             required: true,
         },
         featuredImage: {
             type: String,
         },
+        // Change from string enum to reference Category model
         category: {
-            type: String,
-            enum: [
-                'car',
-                'maintenance',
-                'repair',
-                'tips',
-                'industry',
-                'general',
-            ],
-            default: 'general',
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Category',
+            required: true,
         },
         tags: [
             {
@@ -63,6 +57,11 @@ const blogSchema = new mongoose.Schema(
         timestamps: true,
     },
 );
+
+// Create index for faster queries
+blogSchema.index({ slug: 1 }, { unique: true });
+blogSchema.index({ category: 1, status: 1 });
+blogSchema.index({ tags: 1 });
 
 // Create slug from title
 blogSchema.pre('validate', function (next) {

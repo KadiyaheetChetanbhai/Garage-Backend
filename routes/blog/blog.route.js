@@ -83,7 +83,7 @@ const router = Router();
  */
 router.post(
     '/',
-    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.ADMIN]),
+    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.GARAGE_ADMIN]),
     createBlog,
 );
 
@@ -224,7 +224,7 @@ router.get('/:slug', getBlogDetail);
  */
 router.put(
     '/:id',
-    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.ADMIN]),
+    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.GARAGE_ADMIN]),
     updateBlog,
 );
 
@@ -256,7 +256,7 @@ router.put(
  */
 router.delete(
     '/:id',
-    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.ADMIN]),
+    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.GARAGE_ADMIN]),
     deleteBlog,
 );
 

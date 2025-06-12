@@ -1,16 +1,17 @@
 import jwt from 'jsonwebtoken';
 import { TOKEN_EXPIRY_SHORT } from '../constants/common.constant.js';
 import Customer from '../models/user.model.js';
-import GarageOwner from '../models/garage.model.js';
+import GarageOwner from '../models/garageOwner.model.js';
 import SuperAdmin from '../models/superAdmin.model.js';
-import {USER_TYPES} from '../constants/common.constant.js';
+import { USER_TYPES } from '../constants/common.constant.js';
 
 export const findUserByEmail = async (email) => {
     let user = await Customer.findOne({ email });
     if (user) return { user, userType: USER_TYPES.USER };
 
     user = await GarageOwner.findOne({ email });
-    if (user) return { user, userType: USER_TYPES.GARAGE_OWNER };
+    console.log(user,"garage")
+    if (user) return { user, userType: USER_TYPES.GARAGE_ADMIN };
 
     user = await SuperAdmin.findOne({ email });
     if (user) return { user, userType: USER_TYPES.SUPERADMIN };
@@ -20,10 +21,14 @@ export const findUserByEmail = async (email) => {
 
 export const getUserModel = (userType) => {
     switch (userType) {
-        case USER_TYPES.USER: return Customer;
-        case USER_TYPES.GARAGE_OWNER: return GarageOwner;
-        case USER_TYPES.SUPERADMIN: return SuperAdmin;
-        default: return null;
+        case USER_TYPES.USER:
+            return Customer;
+        case USER_TYPES.GARAGE_ADMIN:
+            return GarageOwner;
+        case USER_TYPES.SUPERADMIN:
+            return SuperAdmin;
+        default:
+            return null;
     }
 };
 

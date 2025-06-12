@@ -90,7 +90,7 @@ router.post(
     '/',
     authorize([
         USER_TYPES.SUPERADMIN,
-        USER_TYPES.ADMIN,
+        USER_TYPES.GARAGE_ADMIN,
         USER_TYPES.GARAGE_ADMIN,
     ]),
     createTransport,
@@ -233,7 +233,7 @@ router.put(
     '/:id',
     authorize([
         USER_TYPES.SUPERADMIN,
-        USER_TYPES.ADMIN,
+        USER_TYPES.GARAGE_ADMIN,
         USER_TYPES.GARAGE_ADMIN,
     ]),
     updateTransport,
@@ -267,7 +267,7 @@ router.put(
  */
 router.delete(
     '/:id',
-    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.ADMIN]),
+    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.GARAGE_ADMIN]),
     deleteTransport,
 );
 
