@@ -1,16 +1,8 @@
 import { Router } from 'express';
-import {
-    createBooking,
-    getBookings,
-    getBookingById,
-    updateBookingStatus,
-    updateBooking,
-    deleteBooking,
-    submitReview,
-    getAnalytics,
-} from '../../controllers/booking.controller.js';
 import { authorize } from '../../middlewares/authorize.middleware.js';
 import { USER_TYPES } from '../../constants/common.constant.js';
+import { createBooking, deleteBooking, getBookingById, getBookings, updateBooking, updateBookingStatus } from '../../controllers/booking.controller.js';
+
 
 const router = Router();
 
@@ -23,104 +15,71 @@ const router = Router();
  *       properties:
  *         opted:
  *           type: boolean
+ *           description: Whether pickup/drop service is requested
  *           example: true
  *         pickupAddress:
  *           type: string
- *           example: "123 Main St, Apt 4B, New York, NY 10001"
+ *           description: Address for vehicle pickup
+ *           example: 123 Customer Street, City, 12345
  *         dropAddress:
  *           type: string
- *           example: "456 Park Ave, New York, NY 10022"
- *     BookingRequest:
- *       type: object
- *       required:
- *         - garageId
- *         - serviceIds
- *         - date
- *         - timeSlotId
- *       properties:
- *         garageId:
- *           type: string
- *           example: "60d21b4667d0d8992e610c85"
- *         serviceIds:
- *           type: array
- *           items:
- *             type: string
- *           example: ["60d21b4667d0d8992e610c86", "60d21b4667d0d8992e610c87"]
- *         date:
- *           type: string
- *           format: date
- *           example: "2023-07-15"
- *         timeSlotId:
- *           type: string
- *           example: "60d21b4667d0d8992e610c88"
- *         pickupDrop:
- *           $ref: '#/components/schemas/PickupDrop'
- *         customerId:
- *           type: string
- *           description: Required only when garage admin creates booking for a customer
- *           example: "60d21b4667d0d8992e610c89"
- *     BookingUpdateStatusRequest:
- *       type: object
- *       required:
- *         - status
- *       properties:
- *         status:
- *           type: string
- *           enum: [pending, confirmed, in-progress, completed, cancelled]
- *           example: "confirmed"
- *         notes:
- *           type: string
- *           example: "Customer requested early completion"
- *     BookingUpdateRequest:
+ *           description: Address for vehicle drop-off
+ *           example: 456 Customer Avenue, City, 12345
+ *
+ *     TimeSlot:
  *       type: object
  *       properties:
- *         serviceIds:
- *           type: array
- *           items:
- *             type: string
- *           example: ["60d21b4667d0d8992e610c86", "60d21b4667d0d8992e610c87"]
- *         date:
+ *         day:
  *           type: string
- *           format: date
- *           example: "2023-07-16"
- *         timeSlotId:
+ *           enum: [Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday]
+ *           description: Day of the week
+ *           example: Monday
+ *         open:
  *           type: string
- *           example: "60d21b4667d0d8992e610c90"
- *         pickupDrop:
- *           $ref: '#/components/schemas/PickupDrop'
- *         notes:
+ *           description: Opening time (HH:MM in 24-hour format)
+ *           example: "09:00"
+ *         close:
  *           type: string
- *           example: "Customer requested additional services"
- *     BookingResponse:
+ *           description: Closing time (HH:MM in 24-hour format)
+ *           example: "17:00"
+ *         isClosed:
+ *           type: boolean
+ *           description: Whether the time slot is closed
+ *           example: false
+ *
+ *     Booking:
  *       type: object
  *       properties:
  *         _id:
  *           type: string
- *           example: "60d21b4667d0d8992e610c91"
+ *           description: Auto-generated booking ID
+ *           example: 60d21b4667d0d8992e610c85
  *         customerId:
  *           type: object
  *           properties:
  *             _id:
  *               type: string
- *               example: "60d21b4667d0d8992e610c89"
+ *               example: 60d21b4667d0d8992e610c90
  *             name:
  *               type: string
- *               example: "John Doe"
+ *               example: John Doe
  *             email:
  *               type: string
- *               example: "johndoe@example.com"
+ *               example: john.doe@example.com
+ *           description: Customer who made the booking
  *         garageId:
  *           type: object
  *           properties:
  *             _id:
  *               type: string
- *               example: "60d21b4667d0d8992e610c85"
+ *               example: 60d21b4667d0d8992e610c80
  *             name:
  *               type: string
- *               example: "Quick Fix Auto"
+ *               example: City Center Garage
  *             address:
  *               type: string
- *               example: "123 Main Street, New York, NY 10001"
+ *               example: 123 Main St, New York, NY 10001
+ *           description: Garage where services will be performed
  *         serviceIds:
  *           type: array
  *           items:
@@ -128,57 +87,88 @@ const router = Router();
  *             properties:
  *               _id:
  *                 type: string
- *                 example: "60d21b4667d0d8992e610c86"
+ *                 example: 60d21b4667d0d8992e610c85
  *               name:
  *                 type: string
- *                 example: "Oil Change"
+ *                 example: Full Engine Service
  *               price:
  *                 type: number
- *                 example: 49.99
+ *                 example: 149.99
  *               duration:
  *                 type: number
- *                 example: 30
+ *                 example: 120
+ *           description: Services requested in this booking
  *         date:
  *           type: string
  *           format: date-time
- *           example: "2023-07-15T00:00:00.000Z"
- *         timeSlot:
- *           type: object
- *           properties:
- *             _id:
- *               type: string
- *               example: "60d21b4667d0d8992e610c88"
- *             day:
- *               type: string
- *               example: "Monday"
- *             startTime:
- *               type: string
- *               example: "10:00"
- *             endTime:
- *               type: string
- *               example: "11:00"
+ *           description: Scheduled date for the booking
+ *           example: 2023-07-15T10:00:00.000Z
+ *         timeSlots:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/TimeSlot'
+ *           description: Time slots selected for this booking
  *         pickupDrop:
  *           $ref: '#/components/schemas/PickupDrop'
+ *         transportPartnerId:
+ *           type: string
+ *           nullable: true
+ *           description: ID of transport partner if pickup/drop service is used
+ *           example: 60d21b4667d0d8992e610c95
  *         status:
  *           type: string
- *           example: "pending"
+ *           enum: [pending, confirmed, in-progress, completed, cancelled]
+ *           description: Current status of the booking
+ *           example: confirmed
  *         totalAmount:
  *           type: number
- *           example: 99.98
+ *           description: Total amount for all services
+ *           example: 149.99
  *         paymentStatus:
  *           type: string
- *           example: "pending"
+ *           enum: [pending, completed, failed, refunded]
+ *           description: Current payment status
+ *           example: pending
+ *         invoiceUrl:
+ *           type: string
+ *           nullable: true
+ *           description: URL to invoice if available
+ *           example: https://example.com/invoices/INV-2023-001.pdf
  *         notes:
  *           type: string
- *           example: "Please check brakes as well"
+ *           nullable: true
+ *           description: Additional notes for the booking
+ *           example: Customer reported unusual engine noise
+ *         createdBy:
+ *           type: object
+ *           properties:
+ *             userId:
+ *               type: string
+ *               example: 60d21b4667d0d8992e610c90
+ *             userType:
+ *               type: string
+ *               example: customer
+ *           description: User who created the booking
+ *         reminderSent:
+ *           type: object
+ *           properties:
+ *             oneHour:
+ *               type: boolean
+ *               example: false
+ *             twentyFourHour:
+ *               type: boolean
+ *               example: true
+ *           description: Status of reminder notifications
  *         createdAt:
  *           type: string
  *           format: date-time
- *           example: "2023-07-10T15:46:28.932Z"
+ *           description: Creation timestamp
+ *           example: 2023-06-20T14:30:15.123Z
  *         updatedAt:
  *           type: string
  *           format: date-time
- *           example: "2023-07-10T15:46:28.932Z"
+ *           description: Last update timestamp
+ *           example: 2023-06-21T09:45:30.987Z
  */
 
 /**
@@ -186,7 +176,6 @@ const router = Router();
  * /bookings:
  *   post:
  *     summary: Create a new booking
- *     description: Create a service booking at a garage
  *     tags:
  *       - Bookings
  *     security:
@@ -196,7 +185,73 @@ const router = Router();
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/BookingRequest'
+ *             type: object
+ *             required:
+ *               - customerId
+ *               - garageId
+ *               - serviceIds
+ *               - date
+ *               - totalAmount
+ *             properties:
+ *               customerId:
+ *                 type: string
+ *                 example: 60d21b4667d0d8992e610c90
+ *               garageId:
+ *                 type: string
+ *                 example: 60d21b4667d0d8992e610c80
+ *               serviceIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["60d21b4667d0d8992e610c85", "60d21b4667d0d8992e610c86"]
+ *               date:
+ *                 type: string
+ *                 format: date-time
+ *                 example: 2023-07-15T10:00:00.000Z
+ *               timeSlots:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/TimeSlot'
+ *                 example:
+ *                   - day: Monday
+ *                     open: "09:00"
+ *                     close: "17:00"
+ *                     isClosed: false
+ *               pickupDrop:
+ *                 $ref: '#/components/schemas/PickupDrop'
+ *               totalAmount:
+ *                 type: number
+ *                 example: 249.98
+ *               notes:
+ *                 type: string
+ *                 example: Please check the brake fluid as well
+ *           examples:
+ *             basicBooking:
+ *               summary: Basic Booking
+ *               value:
+ *                 customerId: 60d21b4667d0d8992e610c90
+ *                 garageId: 60d21b4667d0d8992e610c80
+ *                 serviceIds: ["60d21b4667d0d8992e610c85"]
+ *                 date: 2023-07-15T10:00:00.000Z
+ *                 totalAmount: 149.99
+ *             fullBooking:
+ *               summary: Booking with Pickup/Drop
+ *               value:
+ *                 customerId: 60d21b4667d0d8992e610c90
+ *                 garageId: 60d21b4667d0d8992e610c80
+ *                 serviceIds: ["60d21b4667d0d8992e610c85", "60d21b4667d0d8992e610c86"]
+ *                 date: 2023-07-15T10:00:00.000Z
+ *                 timeSlots:
+ *                   - day: Monday
+ *                     open: "09:00"
+ *                     close: "17:00"
+ *                     isClosed: false
+ *                 pickupDrop:
+ *                   opted: true
+ *                   pickupAddress: 123 Customer Street, City, 12345
+ *                   dropAddress: 456 Customer Avenue, City, 12345
+ *                 totalAmount: 249.98
+ *                 notes: Please check the brake fluid as well
  *     responses:
  *       201:
  *         description: Booking created successfully
@@ -207,21 +262,36 @@ const router = Router();
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Booking created successfully"
+ *                   example: Booking created successfully
  *                 data:
- *                   $ref: '#/components/schemas/BookingResponse'
+ *                   $ref: '#/components/schemas/Booking'
  *       400:
- *         description: Invalid input data
+ *         description: Bad request - invalid input
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - no permission
  *       404:
- *         description: Resource not found
- *       500:
- *         description: Server error
- *
+ *         description: Customer or Garage not found
+ *       422:
+ *         description: Validation error
+ */
+router.post(
+    '/',
+    authorize([
+        USER_TYPES.SUPERADMIN,
+        USER_TYPES.GARAGE_ADMIN,
+        USER_TYPES.CUSTOMER,
+    ]),
+    createBooking,
+);
+
+/**
+ * @swagger
+ * /bookings:
  *   get:
- *     summary: Get all bookings
- *     description: Retrieve a list of bookings with optional filtering
+ *     summary: Get all bookings with filtering
+ *     description: Admins see all bookings, garage owners see their garage's bookings, customers see only their bookings
  *     tags:
  *       - Bookings
  *     security:
@@ -231,59 +301,59 @@ const router = Router();
  *         name: page
  *         schema:
  *           type: integer
- *           minimum: 1
  *           default: 1
  *         description: Page number
- *         example: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           minimum: 1
- *           maximum: 100
  *           default: 10
  *         description: Number of items per page
- *         example: 10
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, date, status, totalAmount]
+ *           default: date
+ *         description: Field to sort by
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, confirmed, in-progress, completed, cancelled]
- *         description: Filter by status
- *         example: "confirmed"
+ *           enum: [pending, confirmed, in-progress, completed, cancelled, all]
+ *         description: Filter by booking status
  *       - in: query
- *         name: fromDate
+ *         name: startDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter by date (start)
- *         example: "2023-07-01"
+ *         description: Filter bookings from this date (YYYY-MM-DD)
  *       - in: query
- *         name: toDate
+ *         name: endDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter by date (end)
- *         example: "2023-07-31"
+ *         description: Filter bookings until this date (YYYY-MM-DD)
  *       - in: query
- *         name: sortField
+ *         name: customerId
  *         schema:
  *           type: string
- *           enum: [createdAt, date, status, totalAmount]
- *           default: createdAt
- *         description: Field to sort by
- *         example: "date"
+ *         description: Filter by customer ID (admin and garage owners only)
  *       - in: query
- *         name: sortOrder
+ *         name: garageId
  *         schema:
- *           type: integer
- *           enum: [-1, 1]
- *           default: -1
- *         description: Sort order (1 for ascending, -1 for descending)
- *         example: 1
+ *           type: string
+ *         description: Filter by garage ID (admin only)
  *     responses:
  *       200:
- *         description: List of bookings retrieved successfully
+ *         description: Bookings retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -291,48 +361,43 @@ const router = Router();
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Bookings retrieved successfully"
+ *                   example: Bookings retrieved successfully
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/BookingResponse'
+ *                     $ref: '#/components/schemas/Booking'
  *                 pagination:
  *                   type: object
  *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       example: 42
  *                     page:
  *                       type: integer
  *                       example: 1
- *                     totalPages:
- *                       type: integer
- *                       example: 3
- *                     totalCount:
- *                       type: integer
- *                       example: 25
- *                     pageSize:
+ *                     limit:
  *                       type: integer
  *                       example: 10
- *                     nextPage:
+ *                     totalPages:
  *                       type: integer
- *                       example: 2
- *                     previousPage:
- *                       type: integer
- *                       example: null
+ *                       example: 5
+ *                     hasNext:
+ *                       type: boolean
+ *                       example: true
+ *                     hasPrevious:
+ *                       type: boolean
+ *                       example: false
+ *       400:
+ *         description: Bad request - invalid parameters
  *       401:
  *         description: Unauthorized
- *       500:
- *         description: Server error
  */
-router.post(
-    '/',
-    authorize([USER_TYPES.USER, USER_TYPES.GARAGE_ADMIN]),
-    createBooking,
-);
 router.get(
     '/',
     authorize([
-        USER_TYPES.USER,
-        USER_TYPES.GARAGE_ADMIN,
         USER_TYPES.SUPERADMIN,
+        USER_TYPES.GARAGE_ADMIN,
+        USER_TYPES.CUSTOMER,
     ]),
     getBookings,
 );
@@ -341,8 +406,8 @@ router.get(
  * @swagger
  * /bookings/{id}:
  *   get:
- *     summary: Get booking details
- *     description: Retrieve details of a specific booking
+ *     summary: Get booking details by ID
+ *     description: Admins can view any booking, garage owners can view their garage's bookings, customers can view only their bookings
  *     tags:
  *       - Bookings
  *     security:
@@ -354,7 +419,6 @@ router.get(
  *         schema:
  *           type: string
  *         description: Booking ID
- *         example: "60d21b4667d0d8992e610c91"
  *     responses:
  *       200:
  *         description: Booking details retrieved successfully
@@ -365,66 +429,34 @@ router.get(
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Booking retrieved successfully"
+ *                   example: Booking details retrieved successfully
  *                 data:
- *                   $ref: '#/components/schemas/BookingResponse'
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Booking not found
- *       500:
- *         description: Server error
- *
- *   patch:
- *     summary: Update booking status
- *     description: Update the status of a booking
- *     tags:
- *       - Bookings
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Booking ID
- *         example: "60d21b4667d0d8992e610c91"
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/BookingUpdateStatusRequest'
- *     responses:
- *       200:
- *         description: Booking status updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Booking status updated successfully"
- *                 data:
- *                   $ref: '#/components/schemas/BookingResponse'
+ *                   $ref: '#/components/schemas/Booking'
  *       400:
- *         description: Invalid input data
+ *         description: Invalid booking ID
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden
+ *         description: Forbidden - no permission to view this booking
  *       404:
  *         description: Booking not found
- *       500:
- *         description: Server error
- *
+ */
+router.get(
+    '/:id',
+    authorize([
+        USER_TYPES.SUPERADMIN,
+        USER_TYPES.GARAGE_ADMIN,
+        USER_TYPES.CUSTOMER,
+    ]),
+    getBookingById,
+);
+
+/**
+ * @swagger
+ * /bookings/{id}:
  *   put:
- *     summary: Update booking details
- *     description: Update the details of a booking (garage admin only)
+ *     summary: Update a booking
+ *     description: Admins can update any booking, garage owners can update their garage's bookings, customers have limited update capabilities
  *     tags:
  *       - Bookings
  *     security:
@@ -436,13 +468,65 @@ router.get(
  *         schema:
  *           type: string
  *         description: Booking ID
- *         example: "60d21b4667d0d8992e610c91"
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/BookingUpdateRequest'
+ *             type: object
+ *             properties:
+ *               serviceIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["60d21b4667d0d8992e610c85", "60d21b4667d0d8992e610c86"]
+ *               date:
+ *                 type: string
+ *                 format: date-time
+ *                 example: 2023-07-20T14:00:00.000Z
+ *               timeSlots:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/TimeSlot'
+ *               pickupDrop:
+ *                 $ref: '#/components/schemas/PickupDrop'
+ *               status:
+ *                 type: string
+ *                 enum: [pending, confirmed, in-progress, completed, cancelled]
+ *                 example: confirmed
+ *               totalAmount:
+ *                 type: number
+ *                 example: 299.99
+ *               paymentStatus:
+ *                 type: string
+ *                 enum: [pending, completed, failed, refunded]
+ *                 example: pending
+ *               notes:
+ *                 type: string
+ *                 example: Customer requested additional inspection
+ *           examples:
+ *             customerUpdate:
+ *               summary: Customer Update (Limited Fields)
+ *               value:
+ *                 pickupDrop:
+ *                   opted: true
+ *                   pickupAddress: 789 New Address, City, 12345
+ *                   dropAddress: 789 New Address, City, 12345
+ *                 notes: I'll be 10 minutes late
+ *             garageUpdate:
+ *               summary: Garage Owner Update
+ *               value:
+ *                 status: confirmed
+ *                 notes: Customer's vehicle has arrived
+ *             adminUpdate:
+ *               summary: Admin Full Update
+ *               value:
+ *                 serviceIds: ["60d21b4667d0d8992e610c85", "60d21b4667d0d8992e610c86", "60d21b4667d0d8992e610c87"]
+ *                 date: 2023-07-20T14:00:00.000Z
+ *                 status: confirmed
+ *                 totalAmount: 349.99
+ *                 paymentStatus: completed
+ *                 notes: Upgraded to premium service package
  *     responses:
  *       200:
  *         description: Booking updated successfully
@@ -453,23 +537,36 @@ router.get(
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Booking updated successfully"
+ *                   example: Booking updated successfully
  *                 data:
- *                   $ref: '#/components/schemas/BookingResponse'
+ *                   $ref: '#/components/schemas/Booking'
  *       400:
- *         description: Invalid input data
+ *         description: Bad request - invalid input
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden
+ *         description: Forbidden - no permission to update this booking
  *       404:
  *         description: Booking not found
- *       500:
- *         description: Server error
- *
+ *       422:
+ *         description: Validation error
+ */
+router.put(
+    '/:id',
+    authorize([
+        USER_TYPES.SUPERADMIN,
+        USER_TYPES.GARAGE_ADMIN,
+        USER_TYPES.CUSTOMER,
+    ]),
+    updateBooking,
+);
+
+/**
+ * @swagger
+ * /bookings/{id}:
  *   delete:
- *     summary: Delete booking
- *     description: Delete a booking (admin only)
+ *     summary: Delete a booking
+ *     description: Only admins and garage owners can delete bookings
  *     tags:
  *       - Bookings
  *     security:
@@ -481,7 +578,6 @@ router.get(
  *         schema:
  *           type: string
  *         description: Booking ID
- *         example: "60d21b4667d0d8992e610c91"
  *     responses:
  *       200:
  *         description: Booking deleted successfully
@@ -492,159 +588,30 @@ router.get(
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Booking deleted successfully"
+ *                   example: Booking deleted successfully
+ *       400:
+ *         description: Bad request - booking cannot be deleted in current status
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden
+ *         description: Forbidden - no permission to delete this booking
  *       404:
  *         description: Booking not found
- *       500:
- *         description: Server error
  */
-router.get(
-    '/:id',
-    authorize([
-        USER_TYPES.USER,
-        USER_TYPES.GARAGE_ADMIN,
-        USER_TYPES.SUPERADMIN,
-    ]),
-    getBookingById,
-);
-router.patch(
-    '/:id/status',
-    authorize([
-        USER_TYPES.USER,
-        USER_TYPES.GARAGE_ADMIN,
-        USER_TYPES.SUPERADMIN,
-    ]),
-    updateBookingStatus,
-);
-router.put(
-    '/:id',
-    authorize([USER_TYPES.GARAGE_ADMIN, USER_TYPES.SUPERADMIN]),
-    updateBooking,
-);
 router.delete(
     '/:id',
-    authorize([USER_TYPES.GARAGE_ADMIN, USER_TYPES.SUPERADMIN]),
+    authorize([USER_TYPES.SUPERADMIN, USER_TYPES.GARAGE_ADMIN]),
     deleteBooking,
 );
 
-// /**
-//  * @swagger
-//  * /bookings/{id}/payment:
-//  *   post:
-//  *     summary: Initiate payment for a booking
-//  *     description: Create a payment intent for a booking
-//  *     tags:
-//  *       - Booking Payments
-//  *     security:
-//  *       - BearerAuth: []
-//  *     parameters:
-//  *       - in: path
-//  *         name: id
-//  *         required: true
-//  *         schema:
-//  *           type: string
-//  *         description: Booking ID
-//  *     responses:
-//  *       200:
-//  *         description: Payment intent created successfully
-//  *       400:
-//  *         description: Invalid request
-//  *       404:
-//  *         description: Booking not found
-//  */
-// router.post(
-//     '/:bookingId/payment',
-//     authorize([USER_TYPES.USER, USER_TYPES.GARAGE_ADMIN]),
-//     initiatePayment,
-// );
-
-// /**
-//  * @swagger
-//  * /bookings/{id}/payment/complete:
-//  *   post:
-//  *     summary: Complete payment for a booking
-//  *     description: Confirm payment and generate invoice
-//  *     tags:
-//  *       - Booking Payments
-//  *     security:
-//  *       - BearerAuth: []
-//  *     parameters:
-//  *       - in: path
-//  *         name: id
-//  *         required: true
-//  *         schema:
-//  *           type: string
-//  *         description: Booking ID
-//  *     requestBody:
-//  *       required: true
-//  *       content:
-//  *         application/json:
-//  *           schema:
-//  *             type: object
-//  *             properties:
-//  *               paymentIntentId:
-//  *                 type: string
-//  *                 description: Stripe payment intent ID
-//  *                 example: "pi_3NZQvdC78YOlxSo91Bvx2X4Y"
-//  *     responses:
-//  *       200:
-//  *         description: Payment completed successfully
-//  *       400:
-//  *         description: Invalid request or payment failed
-//  *       404:
-//  *         description: Booking not found
-//  */
-// router.post(
-//     '/:bookingId/payment/complete',
-//     authorize([USER_TYPES.USER, USER_TYPES.GARAGE_ADMIN]),
-//     completePayment,
-// );
-
-// /**
-//  * @swagger
-//  * /bookings/{id}/refund:
-//  *   post:
-//  *     summary: Process refund for a booking
-//  *     description: Issue refund for a completed payment (admin only)
-//  *     tags:
-//  *       - Booking Payments
-//  *     security:
-//  *       - BearerAuth: []
-//  *     parameters:
-//  *       - in: path
-//  *         name: id
-//  *         required: true
-//  *         schema:
-//  *           type: string
-//  *         description: Booking ID
-//  *     responses:
-//  *       200:
-//  *         description: Refund processed successfully
-//  *       400:
-//  *         description: Invalid request or refund failed
-//  *       403:
-//  *         description: Forbidden - only admins can process refunds
-//  *       404:
-//  *         description: Booking not found
-//  */
-// router.post(
-//     '/:bookingId/refund',
-//     authorize([USER_TYPES.GARAGE_ADMIN, USER_TYPES.SUPERADMIN]),
-//     requestRefund,
-// );
-
 /**
  * @swagger
- * /bookings/{id}/review:
- *   post:
- *     summary: Submit a review for a completed booking
- *     description: Allow customers to review their experience after service completion
+ * /bookings/{id}/status:
+ *   patch:
+ *     summary: Update booking status
+ *     description: Update only the status of a booking with proper validation of status transitions
  *     tags:
- *       - Booking Reviews
+ *       - Bookings
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -661,80 +628,55 @@ router.delete(
  *           schema:
  *             type: object
  *             required:
- *               - rating
- *               - comment
- *               - serviceQuality
- *               - valueForMoney
- *               - punctuality
+ *               - status
  *             properties:
- *               rating:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 example: 4
- *               comment:
+ *               status:
  *                 type: string
- *                 example: "Great service, very professional and fast."
- *               serviceQuality:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 example: 5
- *               valueForMoney:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 example: 4
- *               punctuality:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 example: 4
+ *                 enum: [pending, confirmed, in-progress, completed, cancelled]
+ *                 example: confirmed
+ *           examples:
+ *             confirm:
+ *               summary: Confirm Booking
+ *               value:
+ *                 status: confirmed
+ *             cancel:
+ *               summary: Cancel Booking
+ *               value:
+ *                 status: cancelled
+ *             complete:
+ *               summary: Complete Booking
+ *               value:
+ *                 status: completed
  *     responses:
  *       200:
- *         description: Review submitted successfully
+ *         description: Booking status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Booking status updated successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Booking'
  *       400:
- *         description: Invalid request
+ *         description: Bad request - invalid status transition
+ *       401:
+ *         description: Unauthorized
  *       403:
- *         description: Forbidden - only customers can submit reviews
+ *         description: Forbidden - no permission to update this booking
  *       404:
  *         description: Booking not found
  */
-router.post('/:bookingId/review', authorize([USER_TYPES.USER]), submitReview);
-
-/**
- * @swagger
- * /bookings/analytics:
- *   get:
- *     summary: Get booking analytics
- *     description: Retrieve analytics data about bookings and performance
- *     tags:
- *       - Booking Analytics
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date
- *         description: Start date for analytics (YYYY-MM-DD)
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date
- *         description: End date for analytics (YYYY-MM-DD)
- *     responses:
- *       200:
- *         description: Analytics retrieved successfully
- *       403:
- *         description: Forbidden
- */
-router.get(
-    '/analytics',
-    authorize([USER_TYPES.GARAGE_ADMIN, USER_TYPES.SUPERADMIN]),
-    getAnalytics,
+router.patch(
+    '/:id/status',
+    authorize([
+        USER_TYPES.SUPERADMIN,
+        USER_TYPES.GARAGE_ADMIN,
+        USER_TYPES.CUSTOMER,
+    ]),
+    updateBookingStatus,
 );
 
 export default router;

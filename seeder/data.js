@@ -4,9 +4,9 @@ import { USER_TYPES } from '../constants/common.constant.js';
 export const superAdmins = [
     {
         name: 'SuperAdmin',
-        email: 'petnowadmin@yopmail.com',
+        email: 'superAdmin@yopmail.com',
         userType: USER_TYPES.SUPERADMIN,
-        password: 'Pa$w0rd!',
+        password: 'User@1234',
         isEditable: false,
     },
 ];
@@ -14,24 +14,24 @@ export const superAdmins = [
 // Regular users
 export const users = [
     {
-        name: 'John Smith',
-        email: 'john.smith@example.com',
+        name: 'User 1',
+        email: 'User1@yopmail.com',
         userType: USER_TYPES.USER,
-        password: 'User123!',
+        password: 'User@1234',
         isEditable: true,
     },
     {
-        name: 'Emma Johnson',
-        email: 'emma.j@example.com',
+        name: 'User 2',
+        email: 'User2@yopmail.com',
         userType: USER_TYPES.USER,
-        password: 'User123!',
+        password: 'User@1234',
         isEditable: true,
     },
     {
-        name: 'Michael Brown',
-        email: 'michael.b@example.com',
+        name: 'User 3',
+        email: 'User3@yopmail.com',
         userType: USER_TYPES.USER,
-        password: 'User123!',
+        password: 'User@1234',
         isEditable: true,
     },
 ];
@@ -39,10 +39,10 @@ export const users = [
 // Garage admins
 export const garageAdmins = [
     {
-        name: 'Robert Garcia',
-        email: 'robert.garage@example.com',
+        name: 'Garage Admin',
+        email: 'GarageAdmin@yopmail.com',
         userType: USER_TYPES.GARAGE_ADMIN,
-        password: 'Garage123!',
+        password: 'Garage@1234',
         garageName: 'Quick Fix Auto',
         address: '123 Main Street, New York, NY 10001',
         contactNumber: '212-555-1234',
@@ -50,9 +50,9 @@ export const garageAdmins = [
     },
     {
         name: 'Sarah Johnson',
-        email: 'sarah.garage@example.com',
+        email: 'gARGEAdmin2@yopmail.com',
         userType: USER_TYPES.GARAGE_ADMIN,
-        password: 'Garage123!',
+        password: 'Garage@1234',
         garageName: 'Premium Auto Service',
         address: '456 Oak Avenue, Los Angeles, CA 90001',
         contactNumber: '323-555-6789',

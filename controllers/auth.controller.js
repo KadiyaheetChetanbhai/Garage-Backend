@@ -131,10 +131,18 @@ export const verifyForgotPasswordRequest = async (req, res) => {
     try {
         console.log('hii');
         const result = await verifyForgotPasswordSchema.validateAsync(req.body);
-
+        console.log(result, 'this is result in verifyForgotPasswordRequest');
+        console.log(
+            req.params.userType,
+            'this is req.params.userType in verifyForgotPasswordRequest',)
         const UserModel = getUserModel(req.params.userType);
+        console.log(
+            UserModel,
+            'this is UserModel in verifyForgotPasswordRequest',
+        );
 
         const user = await UserModel.findOne({ email: result.email });
+        console.log(user, 'this is user in verifyForgotPasswordRequest');
         if (!user)
             return errorResponse(res, { message: 'User not found' }, 404);
 

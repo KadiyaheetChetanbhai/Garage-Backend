@@ -1,280 +1,288 @@
-import Booking, { BOOKING_STATUS } from '../models/booking.model.js';
-import Service from '../models/service.model.js';
-import Garage from '../models/garage.model.js';
-import { errorResponse, successResponse } from '../helpers/general.helper.js';
 import mongoose from 'mongoose';
-import { USER_TYPES, DAYS_OF_WEEK } from '../constants/common.constant.js';
+import User from '../models/user.model.js';
+import Garage from '../models/garage.model.js';
+import Service from '../models/service.model.js';
 import {
-    sendBookingConfirmationEmail,
-    sendBookingStatusUpdateEmail,
-} from '../services/booking.service.js';
-
-import { createReview } from '../services/review.service.js';
+    errorResponse,
+    successResponse,
+} from '../helpers/general.helper.js';
 import {
-    getBookingAnalytics,
-    getGaragePerformanceAnalytics,
-} from '../services/analytics.service.js';
+    createBookingSchema,
+    updateBookingSchema,
+    filterBookingSchema,
+} from '../validators/booking.validator.js';
+import { USER_TYPES } from '../constants/common.constant.js';
+import Booking, { BOOKING_STATUS } from '../models/booking.model.js';
+import { sendBookingConfirmationEmail, sendBookingStatusUpdateEmail } from '../services/booking.service.js';
+import { scheduleRemindersForBooking } from '../helpers/sendBookingRemainders.helper.js';
 
-// Create a new booking
+/**
+ * Create a new booking
+ */
 export const createBooking = async (req, res) => {
     try {
-        const {
-            garageId,
-            serviceIds,
-            date,
-            selectedDay,
-            selectedTimeSlot,
-            pickupDrop,
-        } = req.body;
+        // Validate request data
+        const validatedData = await createBookingSchema.validateAsync(req.body);
 
-        // Validate required fields
+        // Get current user info
+        const currentUser = req.user;
+
+        // If regular user, they can only book for themselves
         if (
-            !garageId ||
-            !serviceIds ||
-            !Array.isArray(serviceIds) ||
-            serviceIds.length === 0 ||
-            !date ||
-            !selectedDay ||
-            !selectedTimeSlot
+            currentUser.userType === USER_TYPES.CUSTOMER &&
+            validatedData.customerId !== currentUser._id.toString()
         ) {
             return errorResponse(
                 res,
-                { message: 'Missing required fields' },
-                400,
+                {
+                    message: 'You can only create bookings for yourself',
+                },
+                403,
             );
         }
 
-        // Validate garage exists
-        const garage = await Garage.findById(garageId);
-        if (!garage) {
-            return errorResponse(res, { message: 'Garage not found' }, 404);
+        // Verify customer exists
+        const customer = await User.findById(validatedData.customerId);
+        if (!customer) {
+            return errorResponse(res, { message: 'Customer not found' }, 404);
         }
 
-        // Find the time slot for the selected day
-        const dayTimeSlot = garage.timeSlots.find(
-            (slot) => slot.day === selectedDay,
-        );
-        if (!dayTimeSlot) {
-            return errorResponse(
-                res,
-                { message: 'Selected day is not available' },
-                400,
-            );
-        }
-
-        if (dayTimeSlot.isClosed) {
-            return errorResponse(
-                res,
-                { message: 'Garage is closed on selected day' },
-                400,
-            );
-        }
-
-        // Check if time slot is within opening hours
-        const [selectedHour, selectedMinute] = selectedTimeSlot
-            .split(':')
-            .map(Number);
-        const [openingHour, openingMinute] = dayTimeSlot.open
-            .split(':')
-            .map(Number);
-        const [closingHour, closingMinute] = dayTimeSlot.close
-            .split(':')
-            .map(Number);
-
-        const selectedTime = selectedHour * 60 + selectedMinute;
-        const openingTime = openingHour * 60 + openingMinute;
-        const closingTime = closingHour * 60 + closingMinute;
-
-        if (selectedTime < openingTime || selectedTime >= closingTime) {
-            return errorResponse(
-                res,
-                { message: 'Selected time is outside operating hours' },
-                400,
-            );
-        }
-
-        // Check if time slot is already booked
-        // First, create a booking date from the selected date and time
-        const bookingDate = new Date(date);
-        bookingDate.setHours(selectedHour, selectedMinute, 0, 0);
-
-        // Check for overlapping bookings
-        const existingBooking = await Booking.findOne({
-            garageId,
-            date: {
-                $gte: new Date(bookingDate.getTime() - 30 * 60000), // 30 minutes before
-                $lt: new Date(bookingDate.getTime() + 60 * 60000), // 1 hour after (assuming 1h service)
-            },
-            status: { $ne: BOOKING_STATUS.CANCELLED },
+        // Verify garage exists and is active
+        const garage = await Garage.findOne({
+            _id: validatedData.garageId,
         });
-
-        if (existingBooking) {
+        if (!garage) {
             return errorResponse(
                 res,
-                { message: 'This time slot is already booked' },
-                400,
+                { message: 'Garage not found or inactive' },
+                404,
             );
         }
 
-        // Validate services exist and belong to the garage
+        // // If garage owner, they can only create bookings for their garage
+        // if (
+        //     currentUser.userType === USER_TYPES.GARAGE_ADMIN &&
+        //     currentUser.garage?.toString() !== validatedData.garageId
+        // ) {
+        //     return errorResponse(
+        //         res,
+        //         {
+        //             message: 'You can only create bookings for your own garage',
+        //         },
+        //         403,
+        //     );
+        // }
+
+        // Verify services exist, are active, and belong to the selected garage
+        const serviceIds = validatedData.serviceIds;
         const services = await Service.find({
             _id: { $in: serviceIds },
-            garage: garageId,
+            garage: validatedData.garageId,
             isActive: true,
         });
 
         if (services.length !== serviceIds.length) {
             return errorResponse(
                 res,
-                { message: 'One or more services not found or not active' },
-                404,
-            );
-        }
-
-        // Calculate total amount
-        const totalAmount = services.reduce(
-            (sum, service) => sum + service.price,
-            0,
-        );
-
-        // Create booking
-        const customerId =
-            req.userType === USER_TYPES.USER ? req.userId : req.body.customerId;
-
-        // If garage admin is creating booking, validate customerId is provided
-        if (req.userType === USER_TYPES.GARAGE_ADMIN && !customerId) {
-            return errorResponse(
-                res,
-                { message: 'Customer ID is required' },
+                {
+                    message:
+                        'One or more services are invalid or not available at the selected garage',
+                },
                 400,
             );
         }
 
+        // Calculate total duration and check if appointment fits in working hours
+        // This would involve complex logic based on your business rules
+        // For simplicity, we're just checking time slot validity here
+
+        // Check if date is a valid business day
+        const bookingDate = new Date(validatedData.date);
+        const bookingDay = [
+            'Sunday',
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday',
+        ][bookingDate.getDay()];
+
+        // Find a time slot for the booking day
+        if (validatedData.timeSlots && validatedData.timeSlots.length > 0) {
+            const timeSlotForDay = validatedData.timeSlots.find(
+                (slot) => slot.day === bookingDay,
+            );
+            if (!timeSlotForDay || timeSlotForDay.isClosed) {
+                return errorResponse(
+                    res,
+                    {
+                        message: `The garage is not open on the selected ${bookingDay}`,
+                    },
+                    400,
+                );
+            }
+        }
+
+        // Create booking
         const newBooking = new Booking({
-            customerId,
-            garageId,
-            serviceIds,
-            date: bookingDate,
-            selectedDay,
-            selectedTimeSlot,
-            pickupDrop,
-            totalAmount,
+            ...validatedData,
+            status: BOOKING_STATUS.PENDING,
             createdBy: {
-                userId: req.userId,
-                userType: req.userType,
+                userId: currentUser._id,
+                userType: currentUser.userType,
             },
         });
 
         await newBooking.save();
 
-        // Send booking confirmation email
-        await sendBookingConfirmationEmail(newBooking);
+        // Send confirmation email
+        try {
+            await sendBookingConfirmationEmail(newBooking);
+        } catch (emailError) {
+            console.error('Failed to send booking email:', emailError);
+            
+        }
 
+        // Return success response
         return successResponse(
             res,
             {
                 message: 'Booking created successfully',
-                data: newBooking,
+                data: await Booking.findById(newBooking._id)
+                    .populate('customerId', 'name email')
+                    .populate('garageId', 'name address')
+                    .populate('serviceIds', 'name price duration'),
             },
             201,
         );
     } catch (error) {
-        console.error('Error creating booking:', error);
+        console.error('Create booking error:', error);
         return errorResponse(
             res,
-            { message: 'Error creating booking', error: error.message },
-            500,
+            { message: 'Failed to create booking', error: error.message },
+            error.isJoi ? 422 : 500,
+            error,
         );
     }
 };
 
-// Get all bookings (with filtering)
+/**
+ * Get all bookings with filtering and pagination
+ * Admin and garage owners can see all relevant bookings
+ */
 export const getBookings = async (req, res) => {
     try {
+        // Validate filter parameters
+        const validatedFilters = await filterBookingSchema.validateAsync(
+            req.query,
+        );
+
         const {
-            page = 1,
-            limit = 10,
+            page,
+            limit,
+            sortBy,
+            sortOrder,
             status,
-            fromDate,
-            toDate,
-            sortField = 'createdAt',
-            sortOrder = -1,
-        } = req.query;
+            startDate,
+            endDate,
+            customerId,
+            garageId,
+            searchTerm,
+        } = validatedFilters;
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        // Build query based on user type and filters
+        const query = {};
+        const currentUser = req.user;
 
-        // Build query based on user type
-        let query = {};
+        // // Restrict by user type
+        // if (currentUser.userType === USER_TYPES.CUSTOMER) {
+        //     // Customers can only see their own bookings
+        //     query.customerId = currentUser._id;
+        // } else if (currentUser.userType === USER_TYPES.GARAGE_ADMIN) {
+        //     // Garage owners can only see bookings for their garage
+        //     query.garageId = currentUser.garage;
+        // }
 
-        // For normal users, only show their own bookings
-        if (req.userType === USER_TYPES.USER) {
-            query.customerId = req.userId;
-        }
-        // For garage admins, only show their garage's bookings
-        else if (req.userType === USER_TYPES.GARAGE_ADMIN) {
-            // First get the garage for this admin
-            const garage = await Garage.findOne({ ownerId: req.userId });
-            if (!garage) {
-                return errorResponse(
-                    res,
-                    { message: 'No garage found for this admin' },
-                    404,
-                );
-            }
-            query.garageId = garage._id;
-        }
-
-        // Apply filters
-        if (status) {
+        // Apply additional filters
+        if (status && status !== 'all') {
             query.status = status;
         }
 
-        if (fromDate || toDate) {
-            query.date = {};
-            if (fromDate) query.date.$gte = new Date(fromDate);
-            if (toDate) query.date.$lte = new Date(toDate);
+        if (startDate && endDate) {
+            query.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
+        } else if (startDate) {
+            query.date = { $gte: new Date(startDate) };
+        } else if (endDate) {
+            query.date = { $lte: new Date(endDate) };
         }
 
-        // Count total documents
-        const totalCount = await Booking.countDocuments(query);
+        if (customerId && currentUser.userType !== USER_TYPES.CUSTOMER) {
+            // Only admins and garage owners can filter by customer
+            query.customerId = customerId;
+        }
 
-        // Get bookings
-        const bookings = await Booking.find(query)
-            .sort({ [sortField]: parseInt(sortOrder) })
-            .skip(skip)
-            .limit(parseInt(limit))
-            .populate('customerId', 'name email')
-            .populate('garageId', 'name address timeSlots')
-            .populate('serviceIds', 'name price duration')
-            .exec();
+        if (garageId && currentUser.userType === USER_TYPES.SUPERADMIN) {
+            // Only admins can filter by garage
+            query.garageId = garageId;
+        } else if (garageId && currentUser.userType === USER_TYPES.GARAGE_ADMIN) {
+            // Garage owners can only see bookings for their garage
+            query.garageId = currentUser.garage;
+        }
+
+        if (searchTerm) {
+            // This would require additional aggregation logic to search across related collections
+            // For simplicity, we're omitting this for now
+        }
 
         // Calculate pagination
-        const totalPages = Math.ceil(totalCount / parseInt(limit));
-        const pagination = {
-            page: parseInt(page),
-            totalPages,
-            totalCount,
-            pageSize: parseInt(limit),
-            nextPage: parseInt(page) < totalPages ? parseInt(page) + 1 : null,
-            previousPage: parseInt(page) > 1 ? parseInt(page) - 1 : null,
-        };
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // Execute query
+        const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+
+        const bookings = await Booking.find(query)
+            .populate('customerId', 'name email')
+            .populate('garageId', 'name address')
+            .populate('serviceIds', 'name price')
+            .sort(sort)
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        // Get total count
+        const total = await Booking.countDocuments(query);
+
+        // Prepare pagination data
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrevious = page > 1;
 
         return successResponse(res, {
             message: 'Bookings retrieved successfully',
             data: bookings,
-            pagination,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages,
+                hasNext,
+                hasPrevious,
+            },
         });
     } catch (error) {
-        console.error('Error fetching bookings:', error);
+        console.error('Get bookings error:', error);
         return errorResponse(
             res,
-            { message: 'Error fetching bookings', error: error.message },
-            500,
+            { message: 'Failed to retrieve bookings', error: error.message },
+            error.isJoi ? 400 : 500,
+            error,
         );
     }
 };
 
-// Get a single booking by ID
+/**
+ * Get booking by ID
+ */
 export const getBookingById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -284,358 +292,197 @@ export const getBookingById = async (req, res) => {
         }
 
         const booking = await Booking.findById(id)
-            .populate('customerId', 'name email')
-            .populate('garageId', 'name address phone timeSlots')
+            .populate('customerId', 'name email phone')
+            .populate('garageId', 'name address phone email')
             .populate('serviceIds', 'name price duration')
-            .exec();
+            .populate('transportPartnerId', 'name phone');
 
         if (!booking) {
             return errorResponse(res, { message: 'Booking not found' }, 404);
         }
 
-        // Check if user is authorized to view this booking
-        if (
-            req.userType === USER_TYPES.USER &&
-            booking.customerId._id.toString() !== req.userId
-        ) {
-            return errorResponse(
-                res,
-                { message: 'You are not authorized to view this booking' },
-                403,
-            );
-        } else if (req.userType === USER_TYPES.GARAGE_ADMIN) {
-            // Verify the garage admin owns this garage
-            const garage = await Garage.findOne({
-                _id: booking.garageId,
-                ownerId: req.userId,
-            });
-            if (!garage) {
-                return errorResponse(
-                    res,
-                    { message: 'You are not authorized to view this booking' },
-                    403,
-                );
-            }
-        }
+        // Check permissions
+        const currentUser = req.user;
+
+        // if (
+        //     currentUser.userType === USER_TYPES.CUSTOMER &&
+        //     booking.customerId._id.toString() !== currentUser._id.toString()
+        // ) {
+        //     return errorResponse(
+        //         res,
+        //         { message: 'You do not have permission to view this booking' },
+        //         403,
+        //     );
+        // }
+
+        // if (
+        //     currentUser.userType === USER_TYPES.GARAGE_ADMIN &&
+        //     booking.garageId._id.toString() !== currentUser.garage?.toString()
+        // ) {
+        //     return errorResponse(
+        //         res,
+        //         { message: 'You do not have permission to view this booking' },
+        //         403,
+        //     );
+        // }
 
         return successResponse(res, {
-            message: 'Booking retrieved successfully',
+            message: 'Booking details retrieved successfully',
             data: booking,
         });
     } catch (error) {
-        console.error('Error fetching booking:', error);
+        console.error('Get booking by ID error:', error);
         return errorResponse(
             res,
-            { message: 'Error fetching booking', error: error.message },
+            {
+                message: 'Failed to retrieve booking details',
+                error: error.message,
+            },
             500,
+            error,
         );
     }
 };
 
-// Update booking status
-export const updateBookingStatus = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { status, notes } = req.body;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return errorResponse(res, { message: 'Invalid booking ID' }, 400);
-        }
-
-        // Validate status
-        if (!Object.values(BOOKING_STATUS).includes(status)) {
-            return errorResponse(
-                res,
-                {
-                    message: 'Invalid status',
-                    validStatuses: Object.values(BOOKING_STATUS),
-                },
-                400,
-            );
-        }
-
-        const booking = await Booking.findById(id);
-        if (!booking) {
-            return errorResponse(res, { message: 'Booking not found' }, 404);
-        }
-
-        // Authorization checks
-        if (req.userType === USER_TYPES.USER) {
-            // Users can only cancel their own bookings
-            if (booking.customerId.toString() !== req.userId) {
-                return errorResponse(
-                    res,
-                    {
-                        message:
-                            'You are not authorized to update this booking',
-                    },
-                    403,
-                );
-            }
-
-            // Users can only cancel bookings
-            if (status !== BOOKING_STATUS.CANCELLED) {
-                return errorResponse(
-                    res,
-                    { message: 'Users can only cancel bookings' },
-                    403,
-                );
-            }
-
-            // Cannot cancel if already completed
-            if (booking.status === BOOKING_STATUS.COMPLETED) {
-                return errorResponse(
-                    res,
-                    { message: 'Cannot cancel a completed booking' },
-                    400,
-                );
-            }
-        } else if (req.userType === USER_TYPES.GARAGE_ADMIN) {
-            // Verify the garage admin owns this garage
-            const garage = await Garage.findOne({
-                _id: booking.garageId,
-                ownerId: req.userId,
-            });
-            if (!garage) {
-                return errorResponse(
-                    res,
-                    {
-                        message:
-                            'You are not authorized to update this booking',
-                    },
-                    403,
-                );
-            }
-        }
-
-        // Update booking
-        booking.status = status;
-        if (notes) {
-            booking.notes = notes;
-        }
-
-        await booking.save();
-
-        // Send status update email
-        await sendBookingStatusUpdateEmail(booking);
-
-        return successResponse(res, {
-            message: 'Booking status updated successfully',
-            data: booking,
-        });
-    } catch (error) {
-        console.error('Error updating booking:', error);
-        return errorResponse(
-            res,
-            { message: 'Error updating booking', error: error.message },
-            500,
-        );
-    }
-};
-
-// Update booking details - Only for garage admin
+/**
+ * Update booking by ID
+ */
 export const updateBooking = async (req, res) => {
     try {
         const { id } = req.params;
-        const {
-            serviceIds,
-            date,
-            selectedDay,
-            selectedTimeSlot,
-            pickupDrop,
-            notes,
-        } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return errorResponse(res, { message: 'Invalid booking ID' }, 400);
         }
 
+        // Validate update data
+        const validatedData = await updateBookingSchema.validateAsync(req.body);
+
+        // Get booking
         const booking = await Booking.findById(id);
         if (!booking) {
             return errorResponse(res, { message: 'Booking not found' }, 404);
         }
 
-        // Only garage admins can update booking details
-        if (
-            req.userType !== USER_TYPES.GARAGE_ADMIN &&
-            req.userType !== USER_TYPES.SUPERADMIN
-        ) {
-            return errorResponse(
-                res,
-                { message: 'Only garage admins can update booking details' },
-                403,
-            );
-        }
+        // Check permissions
+        const currentUser = req.user;
 
-        if (req.userType === USER_TYPES.GARAGE_ADMIN) {
-            // Verify the garage admin owns this garage
-            const garage = await Garage.findOne({
-                _id: booking.garageId,
-                ownerId: req.userId,
-            });
-            if (!garage) {
-                return errorResponse(
-                    res,
-                    {
-                        message:
-                            'You are not authorized to update this booking',
-                    },
-                    403,
-                );
-            }
-        }
+        // if (
+        //     currentUser.userType === USER_TYPES.CUSTOMER &&
+        //     booking.customerId.toString() !== currentUser._id.toString()
+        // ) {
+        //     return errorResponse(
+        //         res,
+        //         {
+        //             message:
+        //                 'You do not have permission to update this booking',
+        //         },
+        //         403,
+        //     );
+        // }
 
-        // Cannot update completed or cancelled bookings
-        if (
-            booking.status === BOOKING_STATUS.COMPLETED ||
-            booking.status === BOOKING_STATUS.CANCELLED
-        ) {
-            return errorResponse(
-                res,
-                { message: 'Cannot update completed or cancelled bookings' },
-                400,
-            );
-        }
+        // if (
+        //     currentUser.userType === USER_TYPES.GARAGE_ADMIN &&
+        //     booking.garageId.toString() !== currentUser.garage?.toString()
+        // ) {
+        //     return errorResponse(
+        //         res,
+        //         {
+        //             message:
+        //                 'You do not have permission to update this booking',
+        //         },
+        //         403,
+        //     );
+        // }
 
-        // Update fields if provided
-        if (serviceIds && Array.isArray(serviceIds) && serviceIds.length > 0) {
-            // Validate services exist and belong to the garage
+        // If updating service IDs, verify they exist and belong to the same garage
+        if (validatedData.serviceIds && validatedData.serviceIds.length > 0) {
             const services = await Service.find({
-                _id: { $in: serviceIds },
+                _id: { $in: validatedData.serviceIds },
                 garage: booking.garageId,
                 isActive: true,
             });
 
-            if (services.length !== serviceIds.length) {
+            if (services.length !== validatedData.serviceIds.length) {
                 return errorResponse(
                     res,
-                    { message: 'One or more services not found or not active' },
-                    404,
+                    {
+                        message:
+                            'One or more services are invalid or not available at this garage',
+                    },
+                    400,
                 );
             }
-
-            booking.serviceIds = serviceIds;
-
-            // Recalculate total amount
-            booking.totalAmount = services.reduce(
-                (sum, service) => sum + service.price,
-                0,
-            );
         }
 
-        // If date, day or time slot is being updated
-        if (date || selectedDay || selectedTimeSlot) {
-            // Get the latest garage data
-            const garage = await Garage.findById(booking.garageId);
-            if (!garage) {
-                return errorResponse(res, { message: 'Garage not found' }, 404);
-            }
-
-            // If only date is changing but not day/time
-            const newSelectedDay = selectedDay || booking.selectedDay;
-            const newSelectedTimeSlot =
-                selectedTimeSlot || booking.selectedTimeSlot;
-            const newDate = date ? new Date(date) : new Date(booking.date);
-
-            // Find the time slot for the selected day
-            const dayTimeSlot = garage.timeSlots.find(
-                (slot) => slot.day === newSelectedDay,
-            );
-            if (!dayTimeSlot) {
-                return errorResponse(
-                    res,
-                    { message: 'Selected day is not available' },
-                    400,
-                );
-            }
-
-            if (dayTimeSlot.isClosed) {
-                return errorResponse(
-                    res,
-                    { message: 'Garage is closed on selected day' },
-                    400,
-                );
-            }
-
-            // Check if time slot is within opening hours
-            const [selectedHour, selectedMinute] = newSelectedTimeSlot
-                .split(':')
-                .map(Number);
-            const [openingHour, openingMinute] = dayTimeSlot.open
-                .split(':')
-                .map(Number);
-            const [closingHour, closingMinute] = dayTimeSlot.close
-                .split(':')
-                .map(Number);
-
-            const selectedTime = selectedHour * 60 + selectedMinute;
-            const openingTime = openingHour * 60 + openingMinute;
-            const closingTime = closingHour * 60 + closingMinute;
-
-            if (selectedTime < openingTime || selectedTime >= closingTime) {
-                return errorResponse(
-                    res,
-                    { message: 'Selected time is outside operating hours' },
-                    400,
-                );
-            }
-
-            // Set the booking time on the date object
-            newDate.setHours(selectedHour, selectedMinute, 0, 0);
-
-            // Check for overlapping bookings
-            const existingBooking = await Booking.findOne({
-                _id: { $ne: id }, // Exclude current booking
-                garageId: booking.garageId,
-                date: {
-                    $gte: new Date(newDate.getTime() - 30 * 60000), // 30 minutes before
-                    $lt: new Date(newDate.getTime() + 60 * 60000), // 1 hour after
-                },
-                status: { $ne: BOOKING_STATUS.CANCELLED },
+        // Restrict fields based on user type
+        if (currentUser.userType === USER_TYPES.CUSTOMER) {
+            // Customers can only update limited fields
+            const allowedFields = ['pickupDrop', 'notes'];
+            Object.keys(validatedData).forEach((key) => {
+                if (!allowedFields.includes(key)) {
+                    delete validatedData[key];
+                }
             });
 
-            if (existingBooking) {
-                return errorResponse(
-                    res,
-                    { message: 'This time slot is already booked' },
-                    400,
-                );
+            // Customers cannot update status beyond cancellation
+            if (
+                validatedData.status &&
+                validatedData.status !== BOOKING_STATUS.CANCELLED
+            ) {
+                delete validatedData.status;
             }
 
-            // Update the booking date, day and time slot
-            booking.date = newDate;
-            booking.selectedDay = newSelectedDay;
-            booking.selectedTimeSlot = newSelectedTimeSlot;
+            // Check if cancellation is allowed (e.g., not too close to appointment)
+            if (validatedData.status === BOOKING_STATUS.CANCELLED) {
+                const now = new Date();
+                const bookingDate = new Date(booking.date);
+                const hoursUntilBooking =
+                    (bookingDate - now) / (1000 * 60 * 60);
+
+                if (hoursUntilBooking < 24) {
+                    return errorResponse(
+                        res,
+                        {
+                            message:
+                                'Bookings cannot be cancelled less than 24 hours before the appointment',
+                        },
+                        400,
+                    );
+                }
+            }
         }
 
-        if (pickupDrop) {
-            booking.pickupDrop = {
-                ...booking.pickupDrop,
-                ...pickupDrop,
-            };
-        }
+        // Update booking
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            id,
+            validatedData,
+            { new: true, runValidators: true },
+        )
+            .populate('customerId', 'name email')
+            .populate('garageId', 'name address')
+            .populate('serviceIds', 'name price duration');
 
-        if (notes) {
-            booking.notes = notes;
-        }
-
-        await booking.save();
+        sendBookingStatusUpdateEmail(updatedBooking);
 
         return successResponse(res, {
             message: 'Booking updated successfully',
-            data: booking,
+            data: updatedBooking,
         });
     } catch (error) {
-        console.error('Error updating booking:', error);
+        console.error('Update booking error:', error);
         return errorResponse(
             res,
-            { message: 'Error updating booking', error: error.message },
-            500,
+            { message: 'Failed to update booking', error: error.message },
+            error.isJoi ? 422 : 500,
+            error,
         );
     }
 };
 
-// Delete a booking
+/**
+ * Delete booking by ID (soft delete or restrict based on status)
+ */
 export const deleteBooking = async (req, res) => {
     try {
         const { id } = req.params;
@@ -644,139 +491,233 @@ export const deleteBooking = async (req, res) => {
             return errorResponse(res, { message: 'Invalid booking ID' }, 400);
         }
 
+        // Get booking
         const booking = await Booking.findById(id);
         if (!booking) {
             return errorResponse(res, { message: 'Booking not found' }, 404);
         }
 
-        // Only superadmin or the garage owner can delete bookings
-        if (req.userType !== USER_TYPES.SUPERADMIN) {
-            if (req.userType === USER_TYPES.GARAGE_ADMIN) {
-                // Verify the garage admin owns this garage
-                const garage = await Garage.findOne({
-                    _id: booking.garageId,
-                    ownerId: req.userId,
-                });
-                if (!garage) {
-                    return errorResponse(
-                        res,
-                        {
-                            message:
-                                'You are not authorized to delete this booking',
-                        },
-                        403,
-                    );
-                }
-            } else {
-                return errorResponse(
-                    res,
-                    { message: 'Only admins can delete bookings' },
-                    403,
-                );
-            }
+        // Check permissions
+        const currentUser = req.user;
+
+        // Only admins and garage owners can delete bookings
+        if (currentUser.userType === USER_TYPES.CUSTOMER) {
+            return errorResponse(
+                res,
+                {
+                    message:
+                        'Customers cannot delete bookings. Please cancel the booking instead.',
+                },
+                403,
+            );
         }
 
+        if (
+            currentUser.userType === USER_TYPES.GARAGE_ADMIN &&
+            booking.garageId.toString() !== currentUser.garage?.toString()
+        ) {
+            return errorResponse(
+                res,
+                {
+                    message:
+                        'You do not have permission to delete this booking',
+                },
+                403,
+            );
+        }
+
+        // Restrict deletion based on status
+        if (
+            [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.IN_PROGRESS].includes(
+                booking.status,
+            )
+        ) {
+            return errorResponse(
+                res,
+                {
+                    message: `Bookings in ${booking.status} status cannot be deleted. Please cancel or complete the booking first.`,
+                },
+                400,
+            );
+        }
+
+        
+
+        // Delete booking
         await Booking.findByIdAndDelete(id);
 
         return successResponse(res, {
             message: 'Booking deleted successfully',
         });
     } catch (error) {
-        console.error('Error deleting booking:', error);
+        console.error('Delete booking error:', error);
         return errorResponse(
             res,
-            { message: 'Error deleting booking', error: error.message },
+            { message: 'Failed to delete booking', error: error.message },
             500,
+            error,
         );
     }
 };
 
-// Add review endpoints
-export const submitReview = async (req, res) => {
+/**
+ * Update booking status
+ */
+export const updateBookingStatus = async (req, res) => {
     try {
-        const { bookingId } = req.params;
-        const { rating, comment, serviceQuality, valueForMoney, punctuality } =
-            req.body;
+        const { id } = req.params;
+        const { status } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        if (!mongoose.Types.ObjectId.isValid(id)) {
             return errorResponse(res, { message: 'Invalid booking ID' }, 400);
         }
 
-        // Only users can submit reviews
-        if (req.userType !== USER_TYPES.USER) {
+        if (!Object.values(BOOKING_STATUS).includes(status)) {
             return errorResponse(
                 res,
-                { message: 'Only customers can submit reviews' },
+                {
+                    message: `Invalid status. Must be one of: ${Object.values(BOOKING_STATUS).join(', ')}`,
+                },
+                400,
+            );
+        }
+
+        // Get booking
+        const booking = await Booking.findById(id);
+        if (!booking) {
+            return errorResponse(res, { message: 'Booking not found' }, 404);
+        }
+
+        // Check permissions
+        const currentUser = req.user;
+
+        // Customers can only cancel their own bookings
+        if (currentUser.userType === USER_TYPES.CUSTOMER) {
+            if (booking.customerId.toString() !== currentUser._id.toString()) {
+                return errorResponse(
+                    res,
+                    {
+                        message:
+                            'You do not have permission to update this booking',
+                    },
+                    403,
+                );
+            }
+
+            if (status !== BOOKING_STATUS.CANCELLED) {
+                return errorResponse(
+                    res,
+                    { message: 'Customers can only cancel bookings' },
+                    403,
+                );
+            }
+
+            // Check if cancellation is allowed (e.g., not too close to appointment)
+            const now = new Date();
+            const bookingDate = new Date(booking.date);
+            const hoursUntilBooking = (bookingDate - now) / (1000 * 60 * 60);
+
+            if (hoursUntilBooking < 24) {
+                return errorResponse(
+                    res,
+                    {
+                        message:
+                            'Bookings cannot be cancelled less than 24 hours before the appointment',
+                    },
+                    400,
+                );
+            }
+        }
+
+        // Garage owners can only update bookings for their garage
+        if (
+            currentUser.userType === USER_TYPES.GARAGE_ADMIN &&
+            booking.garageId.toString() !== currentUser.garage?.toString()
+        ) {
+            return errorResponse(
+                res,
+                {
+                    message:
+                        'You do not have permission to update this booking',
+                },
                 403,
             );
         }
 
-        const reviewData = {
-            bookingId,
-            customerId: req.userId,
-            rating,
-            comment,
-            serviceQuality,
-            valueForMoney,
-            punctuality,
-        };
-
-        const review = await createReview(reviewData);
-
-        return successResponse(res, {
-            message: 'Review submitted successfully',
-            data: review,
-        });
-    } catch (error) {
-        console.error('Error submitting review:', error);
-        return errorResponse(
-            res,
-            { message: 'Error submitting review', error: error.message },
-            500,
+        // Validate status transition
+        const isValidTransition = validateStatusTransition(
+            booking.status,
+            status,
         );
-    }
-};
-
-// Add analytics endpoints
-export const getAnalytics = async (req, res) => {
-    try {
-        const { startDate, endDate } = req.query;
-        let garageId = null;
-
-        // For garage admin, only show their garage's analytics
-        if (req.userType === USER_TYPES.GARAGE_ADMIN) {
-            const garage = await Garage.findOne({ ownerId: req.userId });
-            if (!garage) {
-                return errorResponse(
-                    res,
-                    { message: 'No garage found for this admin' },
-                    404,
-                );
-            }
-            garageId = garage._id;
+        if (!isValidTransition) {
+            return errorResponse(
+                res,
+                {
+                    message: `Invalid status transition from ${booking.status} to ${status}`,
+                },
+                400,
+            );
         }
 
-        const bookingAnalytics = await getBookingAnalytics(
-            garageId,
-            startDate,
-            endDate,
-        );
-        const performanceAnalytics =
-            await getGaragePerformanceAnalytics(garageId);
+        // Update booking status
+        booking.status = status;
+
+        // If completing booking, update payment status if applicable
+        if (
+            status === BOOKING_STATUS.COMPLETED &&
+            booking.paymentStatus === 'pending'
+        ) {
+            // In a real app, you might want to check payment gateway status first
+            booking.paymentStatus = 'completed';
+        }
+
+        await booking.save();
+
+        // Populate related data for response
+        const updatedBooking = await Booking.findById(id)
+            .populate('customerId', 'name email')
+            .populate('garageId', 'name address')
+            .populate('serviceIds', 'name');
 
         return successResponse(res, {
-            message: 'Analytics retrieved successfully',
-            data: {
-                bookings: bookingAnalytics,
-                performance: performanceAnalytics,
-            },
+            message: 'Booking status updated successfully',
+            data: updatedBooking,
         });
     } catch (error) {
-        console.error('Error retrieving analytics:', error);
+        console.error('Update booking status error:', error);
         return errorResponse(
             res,
-            { message: 'Error retrieving analytics', error: error.message },
+            {
+                message: 'Failed to update booking status',
+                error: error.message,
+            },
             500,
+            error,
         );
     }
 };
+
+/**
+ * Helper function to validate status transitions
+ */
+function validateStatusTransition(currentStatus, newStatus) {
+    // Define allowed transitions
+    const allowedTransitions = {
+        [BOOKING_STATUS.PENDING]: [
+            BOOKING_STATUS.CONFIRMED,
+            BOOKING_STATUS.CANCELLED,
+        ],
+        [BOOKING_STATUS.CONFIRMED]: [
+            BOOKING_STATUS.IN_PROGRESS,
+            BOOKING_STATUS.CANCELLED,
+        ],
+        [BOOKING_STATUS.IN_PROGRESS]: [
+            BOOKING_STATUS.COMPLETED,
+            BOOKING_STATUS.CANCELLED,
+        ],
+        [BOOKING_STATUS.COMPLETED]: [], // No transitions from completed
+        [BOOKING_STATUS.CANCELLED]: [], // No transitions from cancelled
+    };
+
+    return allowedTransitions[currentStatus]?.includes(newStatus) ?? false;
+}
