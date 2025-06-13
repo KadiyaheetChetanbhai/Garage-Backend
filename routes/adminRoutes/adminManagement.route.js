@@ -102,7 +102,7 @@ router.get('/permissions', getAllPermissions);
  *         description: Unprocessable entity
  */
 router.post(
-    '/create-superAdmin',
+    '/create-admin',
     hasPermission(MODULES.adminManagement, PERMISSION_EVENTS.CREATE),
     createAdmin,
 );

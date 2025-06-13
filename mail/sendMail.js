@@ -331,7 +331,7 @@ const processQueue = async () => {
             // Create email options with enhanced headers
             const mailOptions = {
                 from: {
-                    name: process.env.MAIL_FROM_NAME || 'Pet Now',
+                    name: process.env.MAIL_FROM_NAME || 'Vehical Wellness Team',
                     address: senderEmail,
                 },
                 to,

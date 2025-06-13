@@ -27,13 +27,13 @@ export const TIME_SLOT_STATUS = {
 const logoUrl = `${process.env.SERVER_URL}/public/logo.png`;
 
 export const EMAIL_COMMON_DATA = {
-    appName: 'Pet Now',
+    appName: 'Vehical Wellness',
     copyrightYear: '2025',
     logoUrl,
     websiteUrl: process.env.FRONTEND_URL,
     companyAddress: '123 Paw Street, Petville, USA',
     currentYear: new Date().getFullYear(),
-    supportEmail: 'support@petnow.com',
+    supportEmail: 'support@vehicalwellness.com',
     supportPhone: '+1 (555) 123-4567',
 };
 

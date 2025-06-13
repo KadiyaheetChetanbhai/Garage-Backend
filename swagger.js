@@ -29,7 +29,7 @@ const swaggerOptions = {
         persistAuthorization: true,
     },
     customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Pet Now API Documentation',
+    customSiteTitle: 'Vehical Wellness API Documentation',
 };
 
 const swaggerSpec = swaggerJSDoc(options);

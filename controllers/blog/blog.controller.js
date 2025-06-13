@@ -16,7 +16,6 @@ import {
 
 export const createBlog = async (req, res) => {
     try {
-        // Add the current user as author if not provided
         if (!req.body.author && req.user?._id) {
             req.body.author = req.user._id;
         }

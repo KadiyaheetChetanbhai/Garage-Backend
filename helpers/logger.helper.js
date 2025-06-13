@@ -131,7 +131,7 @@ const logger = winston.createLogger({
         winston.format.splat(),
         winston.format.json(),
     ),
-    defaultMeta: { service: 'petnow-api' },
+    defaultMeta: { service: 'Vehicle_Wellness-api' },
     transports,
 });
 

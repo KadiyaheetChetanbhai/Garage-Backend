@@ -21,6 +21,7 @@ const router = Router();
  *         title:
  *           type: string
  *           description: Title of the blog post
+ *           example: "The Benefits of Regular Vehicle Maintenance"
  *         content:
  *           type: string
  *           description: Main content of the blog post (HTML supported)
