@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
             required: true,
             unique: true,
             trim: true,
-            lowercase: true, // This automatically converts to lowercase when saving
+            lowercase: true, 
         },
         userType: {
             type: String,

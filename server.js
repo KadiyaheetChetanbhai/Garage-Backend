@@ -35,7 +35,7 @@ app.use(
     swaggerUi.setup(swaggerSpec, swaggerOptions),
 );
 app.get('/', (req, res) => {
-    res.send('Greetings from Pet Now');
+    res.send('Greetings from Vehical Wellness');
 });
 app.use(errorHandler);
 

@@ -46,6 +46,17 @@ export const defineReminderJobs = (agenda) => {
                     day: 'numeric',
                 },
             );
+            const formattedTime = (() => {
+                if (booking.timeSlots && booking.timeSlots.length > 0) {
+                    const activeSlot = booking.timeSlots.find(
+                        (slot) => !slot.isClosed,
+                    );
+                    return activeSlot
+                        ? activeSlot.open
+                        : 'Check your booking details';
+                }
+                return booking.selectedTimeSlot || 'Check your booking details';
+            })();
 
             // Send email
             await sendMail({
@@ -58,7 +69,7 @@ export const defineReminderJobs = (agenda) => {
                     garageName: booking.garageId.name,
                     reminderTime: '1 hour',
                     date: formattedDate,
-                    time: booking.selectedTimeSlot,
+                    time: formattedTime,
                     address: booking.garageId.address,
                     phone: booking.garageId.phone,
                     pickupDropService: booking.pickupDrop?.opted || false,
@@ -115,10 +126,17 @@ export const defineReminderJobs = (agenda) => {
                 },
             );
 
-            const timeSlot = booking.timeSlot;
-            const formattedTime = timeSlot
-                ? `${timeSlot.startTime} - ${timeSlot.endTime}`
-                : 'N/A';
+            const formattedTime = (() => {
+                if (booking.timeSlots && booking.timeSlots.length > 0) {
+                    const activeSlot = booking.timeSlots.find(
+                        (slot) => !slot.isClosed,
+                    );
+                    return activeSlot
+                        ? activeSlot.open
+                        : 'Check your booking details';
+                }
+                return booking.selectedTimeSlot || 'Check your booking details';
+            })();
 
             // Send email
             await sendMail({
